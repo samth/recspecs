@@ -15,7 +15,7 @@ jobs:
           distribution: full
           architecture: x64
       - name: Install package
-        run: raco pkg install --auto --batch --name recspecs .
+        run: raco pkg install --auto
       - name: Build package
         run: raco setup --check-pkg-deps --unused-pkg-deps recspecs
       - name: Run tests
