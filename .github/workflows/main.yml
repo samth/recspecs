@@ -1,12 +1,22 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
 
 jobs:
-  ci:
-    runs-on: ubuntu-latest    
+  test:
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
-    - uses: jackfirth/racket-package-ci-action@v0.1.4
-      with:
-        name: recspecs
+      - uses: actions/checkout@v3
+      - uses: Bogdanp/setup-racket@v1.13
+        with:
+          version: stable
+          distribution: full
+          architecture: x64
+      - name: Install package
+        run: raco pkg install --auto
+      - name: Build package
+        run: raco setup --check-pkg-deps --unused-pkg-deps recspecs
+      - name: Run tests
+        run: raco test -x -p recspecs
