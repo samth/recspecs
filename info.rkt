@@ -9,7 +9,8 @@
               "recspecs")))
 
 (define deps
-  (list "base"))
+  (list "rackunit-lib"
+        "base"))
 
 (define build-deps
   (list "racket-doc"
