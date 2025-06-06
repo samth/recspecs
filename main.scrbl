@@ -2,3 +2,23 @@
 
 @title{recspecs: Expect Testing for Racket}
 @defmodule[recspecs]
+
+The @racket[expect] form captures anything printed to the current output
+port while evaluating an expression and compares it to a string literal
+stored directly in the source file.  Each use expands to a
+RackUnit @racket[test-case].  When the environment variable
+@tt{RECSPECS_UPDATE} is set and the expectation does not match, the file
+is rewritten with the new output instead of failing the test.
+
+@defform[(expect expr expected-str)]{
+Evaluates @racket[expr] and checks that the captured output is equal to
+@racket[expected-str]. If they differ and @tt{RECSPECS_UPDATE} is set,
+the expectation string in the source file is replaced with the new
+value.  Otherwise the test case fails.
+}
+
+@racketblock[
+  (require recspecs)
+  (expect (displayln "hello") "hello\n")]
+
+
