@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: bogdan/setup-plt@v1
+      - uses: bogdan/setup-racket@v1
         with:
           version: stable
           distribution: full
