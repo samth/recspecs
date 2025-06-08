@@ -10,6 +10,13 @@ captured output against the recorded expectation. When the environment
 variable `RECSPECS_UPDATE` is set, failing expectations are automatically
 updated in the file instead of causing a failure.
 
+Additional forms mirror features from the OCaml and Rust libraries:
+
+* `expect-file` compares the output against the contents of a separate file
+  and rewrites that file when updating.
+* `expect-exn` checks that an expression raises an exception with a given
+  message.
+
 ## Example
 
 ```racket
@@ -34,6 +41,7 @@ $ RECSPECS_UPDATE=1 raco test my-test.rkt
 ## Status
 
 This library is experimental but demonstrates the core API. It now shows a
-colorized diff when expectations fail. Further features like tighter
-integration with rackunit can be added in the future.
+colorized diff when expectations fail and supports file based expectations
+and exception checks. Further features like tighter integration with
+rackunit can be added in the future.
 

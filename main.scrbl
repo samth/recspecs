@@ -23,4 +23,14 @@ value.  Otherwise the test case fails.
   (require recspecs)
   (expect (displayln "hello") "hello\n")]
 
+@defform[(expect-file expr path-str)]{
+Reads the expectation from @racket[path-str] instead of embedding it in the
+source. The file is replaced with new output when @tt{RECSPECS_UPDATE} is set.
+}
+
+@defform[(expect-exn expr expected-str)]{
+Checks that @racket[expr] raises an exception whose message matches
+@racket[expected-str]. The message is updated when update mode is enabled.
+}
+
 
