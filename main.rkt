@@ -10,7 +10,9 @@
          (for-syntax racket/base
                      syntax/parse))
 
-(provide expect)
+(provide expect
+         expect-file
+         expect-exn)
 
 ;; Returns #t when expectations should be updated instead of reported as
 ;; failures. The update mode is enabled when the environment variable
@@ -31,6 +33,13 @@
     #:exists 'truncate/replace
     (lambda (out)
       (write-bytes new-bs out))))
+
+;; Replace the entire file at `path` with `new-str`.
+(define (update-file-entire path _pos _span new-str)
+  (call-with-output-file path
+    #:exists 'truncate/replace
+    (lambda (out)
+      (display new-str out))))
 
 ;; Split a string into lines without dropping trailing empty lines
 (define (string->lines s)
@@ -88,7 +97,8 @@
        [(cons 'del l) (color "31" (string-append "- " l))]))
    "\n"))
 
-(define (run-expect thunk expected path pos span)
+(define (run-expect thunk expected path pos span
+                    [update update-file])
   ;; Returns a rackunit test that evaluates `thunk`, captures anything printed
   ;; to the current output port and compares it to `expected`. When update mode
   ;; is enabled and the values differ, the source file is rewritten instead of
@@ -100,7 +110,7 @@
     (define actual (with-output-to-string thunk))
     (cond
       [(and path (update-mode?) (not (string=? actual expected)))
-       (update-file path pos span actual)
+       (update path pos span actual)
        (printf "Updated expectation in ~a\n" path)]
       [(string=? actual expected)
        (check-equal? actual expected)]
@@ -109,15 +119,63 @@
        (displayln (pretty-diff expected actual) (current-error-port))
        (check-equal? actual expected)])))
 
+(define (run-expect-exn thunk expected path pos span
+                        [update update-file])
+  (define name (if path
+                   (format "~a:~a" path pos)
+                   "expect-exn"))
+  (test-case name
+    (with-handlers ([exn:fail?
+                     (lambda (e)
+                       (define actual (exn-message e))
+                       (cond
+                         [(and path (update-mode?) (not (string=? actual expected)))
+                          (update path pos span actual)
+                          (printf "Updated expectation in ~a\n" path)]
+                         [(string=? actual expected)
+                          (check-equal? actual expected)]
+                         [else
+                          (displayln "Diff:" (current-error-port))
+                          (displayln (pretty-diff expected actual) (current-error-port))
+                          (check-equal? actual expected)]))])
+      (begin
+        (thunk)
+        (fail "expected an exception")))))
+
 (define-syntax (expect stx)
+  (syntax-parse stx
+    [(_ expr expected:str)
+      (define src (syntax-source #'expected))
+      (define pos (or (syntax-position #'expected) 0))
+      (define span (or (syntax-span #'expected)
+                       (string-length (syntax-e #'expected))))
+      #`(run-expect (lambda () expr)
+                    expected
+                    #,(and src (path->string src))
+                    #,pos
+                    #,span)]))
+
+(define-syntax (expect-file stx)
+  (syntax-parse stx
+    [(_ expr path:str)
+     #'(let ([p path])
+         (run-expect (lambda () expr)
+                     (call-with-input-file p port->string)
+                     (path->string p)
+                     0
+                     0
+                     update-file-entire))]))
+
+(define-syntax (expect-exn stx)
   (syntax-parse stx
     [(_ expr expected:str)
      (define src (syntax-source #'expected))
      (define pos (or (syntax-position #'expected) 0))
      (define span (or (syntax-span #'expected)
                       (string-length (syntax-e #'expected))))
-     #`(run-expect (lambda () expr)
-                   expected
-                   #,(and src (path->string src))
-                   #,pos
-                   #,span)]))
+     #'(run-expect-exn (lambda () expr)
+                       expected
+                       #,(and src (path->string src))
+                       #,pos
+                       #,span)]))
+
