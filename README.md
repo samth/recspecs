@@ -33,7 +33,7 @@ $ RECSPECS_UPDATE=1 raco test my-test.rkt
 
 ## Status
 
-This library is experimental but demonstrates the core API.  More features,
-like integration with rackunit and pretty diff output, can be added in the
-future.
+This library is experimental but demonstrates the core API. It now shows a
+colorized diff when expectations fail. Further features like tighter
+integration with rackunit can be added in the future.
 
