@@ -8,7 +8,8 @@
          racket/match
          rackunit
          (for-syntax racket/base
-                     syntax/parse))
+                     syntax/parse
+                     racket/list))
 
 (provide expect
          expect-file
@@ -183,23 +184,27 @@
 
 (define-syntax (expect stx)
   (syntax-parse stx
-    [(_ expr expected:str ...
+    [(_ expr expected-first:str expected-rest:str ...
         (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f])))
-     (define expect-list (syntax->list #'(expected ...)))
-     (define first (car expect-list))
-     (define last (car (reverse expect-list)))
+     (define expect-list (syntax->list #'(expected-first expected-rest ...)))
+     (define first #'expected-first)
+     (define last-syn (if (null? (syntax->list #'(expected-rest ...)))
+                         #'expected-first
+                         (last expect-list)))
      (define src (syntax-source first))
      (define pos (or (syntax-position first) 0))
-     (define span (- (+ (or (syntax-position last) 0)
-                        (or (syntax-span last)
-                            (string-length (syntax-e last))))
+     (define span (- (+ (or (syntax-position last-syn) 0)
+                        (or (syntax-span last-syn)
+                            (string-length (syntax-e last-syn))))
                      pos))
      #`(run-expect (lambda () expr)
                    (string-append #,@expect-list)
                    #,(and src (path->string src))
                    #,pos
                    #,span
-                   #:strict s?)]))
+                   #:strict s?)]
+    [(_ expr (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f])))
+     #'(run-expect (lambda () expr) "" #f 0 0 #:strict s?)]))
 
 (define-syntax (expect-file stx)
   (syntax-parse stx
@@ -215,21 +220,25 @@
 
 (define-syntax (expect-exn stx)
   (syntax-parse stx
-    [(_ expr expected:str ...
+    [(_ expr expected-first:str expected-rest:str ...
         (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f])))
-     (define expect-list (syntax->list #'(expected ...)))
-     (define first (car expect-list))
-     (define last (car (reverse expect-list)))
-     (define src (syntax-source first))
-     (define pos (or (syntax-position first) 0))
-     (define span (- (+ (or (syntax-position last) 0)
-                        (or (syntax-span last)
-                            (string-length (syntax-e last))))
+     (define expect-list (syntax->list #'(expected-first expected-rest ...)))
+     (define first #'expected-first)
+     (define last-syn (if (null? (syntax->list #'(expected-rest ...)))
+                         #'expected-first
+                         (last expect-list)))
+    (define src (syntax-source first))
+    (define pos (or (syntax-position first) 0))
+    (define span (- (+ (or (syntax-position last-syn) 0)
+                        (or (syntax-span last-syn)
+                            (string-length (syntax-e last-syn))))
                      pos))
      #`(run-expect-exn (lambda () expr)
                        (string-append #,@expect-list)
                        #,(and src (path->string src))
                        #,pos
                        #,span
-                       #:strict s?)]))
+                       #:strict s?)]
+    [(_ expr (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f])))
+     #'(run-expect-exn (lambda () expr) "" #f 0 0 #:strict s?)]))
 
