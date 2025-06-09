@@ -16,6 +16,9 @@ Additional forms mirror features from the OCaml and Rust libraries:
   and rewrites that file when updating.
 * `expect-exn` checks that an expression raises an exception with a given
   message.
+* All expectation forms accept multiple string arguments which are
+  concatenated together. This is handy when using
+  `#lang at-exp` for multi-line expectations.
 * Setting the `RECSPECS_UPDATE_TEST` environment variable to a test case
   name limits updates to only that expectation.
 
@@ -30,6 +33,18 @@ Additional forms mirror features from the OCaml and Rust libraries:
     (displayln "hello")
     (displayln (+ 1 2)))
   "hello\n3\n")
+```
+
+Using @ expressions from `#lang at-exp` can make multi-line output
+easier to write:
+
+```racket
+#lang at-exp racket
+(require recspecs)
+
+@expect[(begin (displayln "hello") (displayln (+ 1 2)))]{
+hello
+3}
 ```
 
 Run the file with `raco test` (or any RackUnit runner) to execute the
