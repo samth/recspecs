@@ -16,9 +16,16 @@
 
 ;; Returns #t when expectations should be updated instead of reported as
 ;; failures. The update mode is enabled when the environment variable
-;; RECSPECS_UPDATE is set to any value.
-(define (update-mode?)
-  (and (getenv "RECSPECS_UPDATE") #t))
+;; RECSPECS_UPDATE is set to any value. When the optional
+;; RECSPECS_UPDATE_TEST is set, only test cases whose names contain the
+;; given string are updated.
+(define (update-mode? [name #f])
+  (define update? (getenv "RECSPECS_UPDATE"))
+  (and update?
+       (let ([filter (getenv "RECSPECS_UPDATE_TEST")])
+         (if filter
+             (and name (string-contains? name filter))
+             #t))))
 
 (define (update-file path pos span new-str)
   ;; Replace the expectation string located at [pos, pos+span) in the file
@@ -109,7 +116,7 @@
   (test-case name
     (define actual (with-output-to-string thunk))
     (cond
-      [(and path (update-mode?) (not (string=? actual expected)))
+      [(and path (update-mode? name) (not (string=? actual expected)))
        (update path pos span actual)
        (printf "Updated expectation in ~a\n" path)]
       [(string=? actual expected)
@@ -129,7 +136,7 @@
                      (lambda (e)
                        (define actual (exn-message e))
                        (cond
-                         [(and path (update-mode?) (not (string=? actual expected)))
+                         [(and path (update-mode? name) (not (string=? actual expected)))
                           (update path pos span actual)
                           (printf "Updated expectation in ~a\n" path)]
                          [(string=? actual expected)
