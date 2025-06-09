@@ -137,21 +137,23 @@
                    "expect"))
   (test-case name
     (define actual (with-output-to-string thunk))
-    (define equal?
+    (define comparator
       (if strict?
-          (string=? actual expected)
-          (string=? (normalize-string actual)
-                    (normalize-string expected))))
+          string=?
+          (lambda (e a)
+            (string=? (normalize-string a)
+                      (normalize-string e)))))
+    (define equal? (comparator expected actual))
     (cond
       [(and path (update-mode? name) (not equal?))
        (update path pos span actual)
        (printf "Updated expectation in ~a\n" path)]
       [equal?
-       (check-true equal?)]
+       (check comparator expected actual)]
       [else
        (displayln "Diff:" (current-error-port))
        (displayln (pretty-diff expected actual) (current-error-port))
-       (check-true equal?)])))
+       (check comparator expected actual)])))
 
 (define (run-expect-exn thunk expected path pos span
                         [update update-file]
@@ -163,21 +165,23 @@
     (with-handlers ([exn:fail?
                      (lambda (e)
                        (define actual (exn-message e))
-                       (define equal?
+                       (define comparator
                          (if strict?
-                             (string=? actual expected)
-                             (string=? (normalize-string actual)
-                                       (normalize-string expected))))
+                             string=?
+                             (lambda (e a)
+                               (string=? (normalize-string a)
+                                         (normalize-string e)))))
+                       (define equal? (comparator expected actual))
                        (cond
                          [(and path (update-mode? name) (not equal?))
                           (update path pos span actual)
                           (printf "Updated expectation in ~a\n" path)]
                          [equal?
-                          (check-true equal?)]
+                          (check comparator expected actual)]
                          [else
                           (displayln "Diff:" (current-error-port))
                           (displayln (pretty-diff expected actual) (current-error-port))
-                          (check-true equal?)]))])
+                          (check comparator expected actual)]))])
       (begin
         (thunk)
         (fail "expected an exception")))))
