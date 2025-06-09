@@ -52,8 +52,9 @@
   ;; Replace the expectation string located at [pos, pos+span) in the file
   ;; at `path` with the printed representation of `new-str`.
   (define bs (file->bytes path))
-  (define before (subbytes bs 0 pos))
-  (define after (subbytes bs (+ pos span)))
+  (define start (sub1 pos))
+  (define before (subbytes bs 0 start))
+  (define after (subbytes bs (+ start span)))
   (define new-bs (bytes-append before
                                (string->bytes/utf-8 (format "~s" new-str))
                                after))
