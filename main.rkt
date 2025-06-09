@@ -8,6 +8,7 @@
          racket/match
          rackunit
          (for-syntax racket/base
+                     racket/list
                      syntax/parse))
 
 (provide expect
@@ -151,16 +152,20 @@
 
 (define-syntax (expect stx)
   (syntax-parse stx
-    [(_ expr expected:str)
-      (define src (syntax-source #'expected))
-      (define pos (or (syntax-position #'expected) 0))
-      (define span (or (syntax-span #'expected)
-                       (string-length (syntax-e #'expected))))
-      #`(run-expect (lambda () expr)
-                    expected
-                    #,(and src (path->string src))
-                    #,pos
-                    #,span)]))
+    [(_ expr expected:str ...+)
+     (define exp-syns (syntax->list #'(expected ...)))
+     (define src (syntax-source (car exp-syns)))
+     (define pos (or (syntax-position (car exp-syns)) 0))
+     (define last-syn (last exp-syns))
+     (define end-pos (+ (or (syntax-position last-syn) 0)
+                        (or (syntax-span last-syn)
+                            (string-length (syntax-e last-syn)))))
+     (define span (- end-pos pos))
+     #`(run-expect (lambda () expr)
+                   (string-append expected ...)
+                   #,(and src (path->string src))
+                   #,pos
+                   #,span)]))
 
 (define-syntax (expect-file stx)
   (syntax-parse stx
@@ -175,13 +180,17 @@
 
 (define-syntax (expect-exn stx)
   (syntax-parse stx
-    [(_ expr expected:str)
-     (define src (syntax-source #'expected))
-     (define pos (or (syntax-position #'expected) 0))
-     (define span (or (syntax-span #'expected)
-                      (string-length (syntax-e #'expected))))
+    [(_ expr expected:str ...+)
+     (define exp-syns (syntax->list #'(expected ...)))
+     (define src (syntax-source (car exp-syns)))
+     (define pos (or (syntax-position (car exp-syns)) 0))
+     (define last-syn (last exp-syns))
+     (define end-pos (+ (or (syntax-position last-syn) 0)
+                        (or (syntax-span last-syn)
+                            (string-length (syntax-e last-syn)))))
+     (define span (- end-pos pos))
      #'(run-expect-exn (lambda () expr)
-                       expected
+                       (string-append expected ...)
                        #,(and src (path->string src))
                        #,pos
                        #,span)]))

@@ -30,6 +30,20 @@ value.  Otherwise the test case fails.
   (require recspecs)
   (expect (displayln "hello") "hello\n")]
 
+@para{When using @racket[#lang at-exp], the whole form can use @ notation so
+the expected output is written as a block:}
+
+@racketblock[
+  #lang at-exp racket
+  (require recspecs)
+
+  @expect[(begin
+            (displayln "hello")
+            (displayln (+ 1 2)))]{
+    hello
+    3
+  }]
+
 @defform[(expect-file expr path-str)]{
 Reads the expectation from @racket[path-str] instead of embedding it in the
 source. The file is replaced with new output when @tt{RECSPECS_UPDATE} is set.

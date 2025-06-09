@@ -32,6 +32,21 @@ Additional forms mirror features from the OCaml and Rust libraries:
   "hello\n3\n")
 ```
 
+The expected string can itself be constructed using @ expressions from
+`#lang at-exp`. Using @ notation for the whole form lets the output be written
+directly as a block:
+
+```racket
+#lang at-exp racket
+(require recspecs)
+
+@expect[(begin
+          (displayln "hello")
+          (displayln (+ 1 2)))]{hello
+3
+}
+```
+
 Run the file with `raco test` (or any RackUnit runner) to execute the
 expectations. If they fail and you want to update the saved output, set
 `RECSPECS_UPDATE`:
