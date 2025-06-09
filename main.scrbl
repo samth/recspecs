@@ -14,6 +14,11 @@ diff is printed to help understand the mismatch. Updating can be
 restricted to a single test case by setting
 @tt{RECSPECS_UPDATE_TEST} to the name shown for that case.
 
+For Emacs users, the accompanying @filepath{emacs/recspecs.el} file
+provides @racketfont{recspecs-update-at-point}, which runs the current
+file under @exec{racket-test} with those environment variables set for
+the expectation at the cursor position.
+
 @defform[(expect expr expected-str)]{
 Evaluates @racket[expr] and checks that the captured output is equal to
 @racket[expected-str]. If they differ and @tt{RECSPECS_UPDATE} is set,

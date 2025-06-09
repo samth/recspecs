@@ -46,6 +46,14 @@ shown for that test case:
 $ RECSPECS_UPDATE=1 RECSPECS_UPDATE_TEST=my-test.rkt:42 raco test my-test.rkt
 ```
 
+### Emacs integration
+
+The file `emacs/recspecs.el` defines a helper command
+`recspecs-update-at-point`.  When called from a buffer visiting a Racket
+file under `racket-mode`, it reruns that file with
+`RECSPECS_UPDATE` enabled and sets `RECSPECS_UPDATE_TEST` to the
+expectation at point so only that one is updated.
+
 ## Status
 
 This library is experimental but demonstrates the core API. It now shows a
