@@ -113,11 +113,13 @@
   diffs)
 
 ;; Render a diff as a string with ANSI color codes
-(define (pretty-diff expected actual)
+(define (pretty-diff expected actual #:color? [color? #t])
   (define diffs (lines-diff (string->lines expected)
                             (string->lines actual)))
   (define (color c s)
-    (string-append "\x1b[" c "m" s "\x1b[0m"))
+    (if color?
+        (string-append "\x1b[" c "m" s "\x1b[0m")
+        s))
   (string-join
    (for/list ([d diffs])
      (match d
@@ -152,8 +154,11 @@
       [equal?
        (check comparator expected actual)]
       [else
+       (define color? (and (terminal-port? (current-error-port))
+                           (not (getenv "NO_COLOR"))) )
        (displayln "Diff:" (current-error-port))
-       (displayln (pretty-diff expected actual) (current-error-port))
+       (displayln (pretty-diff expected actual #:color? color?)
+                  (current-error-port))
        (check comparator expected actual)])))
 
 (define (run-expect-exn thunk expected path pos span
@@ -180,8 +185,11 @@
                          [equal?
                           (check comparator expected actual)]
                          [else
+                          (define color? (and (terminal-port? (current-error-port))
+                                              (not (getenv "NO_COLOR"))) )
                           (displayln "Diff:" (current-error-port))
-                          (displayln (pretty-diff expected actual) (current-error-port))
+                          (displayln (pretty-diff expected actual #:color? color?)
+                                     (current-error-port))
                           (check comparator expected actual)]))])
       (begin
         (thunk)
