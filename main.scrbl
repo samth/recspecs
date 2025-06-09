@@ -10,7 +10,9 @@ RackUnit @racket[test-case].  When the environment variable
 @tt{RECSPECS_UPDATE} is set and the expectation does not match, the file
 is rewritten with the new output instead of failing the test.  When
 @tt{RECSPECS_UPDATE} is not set and the expectation fails, a colorized
-diff is printed to help understand the mismatch.
+diff is printed to help understand the mismatch. Updating can be
+restricted to a single test case by setting
+@tt{RECSPECS_UPDATE_TEST} to the name shown for that case.
 
 @defform[(expect expr expected-str)]{
 Evaluates @racket[expr] and checks that the captured output is equal to

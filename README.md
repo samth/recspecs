@@ -16,6 +16,8 @@ Additional forms mirror features from the OCaml and Rust libraries:
   and rewrites that file when updating.
 * `expect-exn` checks that an expression raises an exception with a given
   message.
+* Setting the `RECSPECS_UPDATE_TEST` environment variable to a test case
+  name limits updates to only that expectation.
 
 ## Example
 
@@ -36,6 +38,12 @@ expectations. If they fail and you want to update the saved output, set
 
 ```console
 $ RECSPECS_UPDATE=1 raco test my-test.rkt
+```
+To update just one expectation, set `RECSPECS_UPDATE_TEST` to the name
+shown for that test case:
+
+```console
+$ RECSPECS_UPDATE=1 RECSPECS_UPDATE_TEST=my-test.rkt:42 raco test my-test.rkt
 ```
 
 ## Status
