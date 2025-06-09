@@ -17,9 +17,21 @@
 Searches backward for an `expect` form and returns the position of its
 expectation string.  Signal an error if none is found."
   (save-excursion
-    (unless (re-search-backward "(expect\(-exn\)?\|expect-file" nil t)
+    (unless (re-search-backward
+             (rx (or (seq "("
+                         (or "expect" "expect-exn" "expect-file")
+                         symbol-end)
+                     (seq "@" (? "(")
+                         (or "expect" "expect-exn" "expect-file")
+                         symbol-end)))
+             nil t)
       (error "No expect form found"))
-    (forward-char 1) ;; skip the opening paren
+    (when (looking-at "@")
+      (forward-char 1)
+      (when (looking-at "(")
+        (forward-char 1)))
+    (when (looking-at "(")
+      (forward-char 1)) ;; skip opening paren if present
     (forward-symbol 1) ;; skip expect / expect-exn / expect-file
     (skip-chars-forward "\s-")
     (forward-sexp 1) ;; expression or path
