@@ -7,11 +7,15 @@
   (test-suite
    "expect-tests"
    (expect (display "hello") "hello")
-   (expect (begin
-             (displayln "hello")
-             (displayln (+ 1 2)))
-           "hello\n3\n")
-   (expect (void) "")))
+  (expect (begin
+            (displayln "hello")
+            (displayln (+ 1 2)))
+          "hello\n3\n")
+  (expect (void) "")
+  ;; Flexible whitespace matching
+  (expect (display "hello") "  hello  \n")
+  ;; Strict matching
+  (expect (display "strict") "strict" #:strict? #t)))
 
 (module+ test
   (run-tests expect-tests))
