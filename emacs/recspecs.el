@@ -50,7 +50,7 @@ expectation string.  Signal an error if none is found."
     (cond
      ((fboundp 'racket-test) (racket-test))
      ((fboundp 'racket-run) (racket-run))
-     (t (compile (format "raco test %s" (shell-quote-argument file))))))
+     (t (compile (format "raco test %s" (shell-quote-argument file)))))))
 
 (provide 'recspecs)
 
