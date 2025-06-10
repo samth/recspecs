@@ -10,7 +10,8 @@
 
 (define deps
   (list "rackunit-lib"
-        "base"))
+        "base"
+        "at-exp-lib"))
 
 (define build-deps
   (list "racket-doc"
