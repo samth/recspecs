@@ -9,7 +9,8 @@
          rackunit
          (for-syntax racket/base
                      syntax/parse
-                     racket/list))
+                     racket/list
+                     racket/file))
 
 (provide expect
          expect-file
@@ -57,6 +58,23 @@
   (define after (subbytes bs (+ start span)))
   (define new-bs (bytes-append before
                                (string->bytes/utf-8 (format "~s" new-str))
+                               after))
+  (call-with-output-file path
+    #:exists 'truncate/replace
+    (lambda (out)
+      (write-bytes new-bs out))))
+
+;; Replace empty braces at [pos, pos+span) with `{new-str}`
+(define (update-file-empty path pos span new-str)
+  (define bs (file->bytes path))
+  (define start (sub1 pos))
+  (define before (subbytes bs 0 start))
+  (define snippet (bytes->string/utf-8 (subbytes bs start (+ start span))))
+  (define after (subbytes bs (+ start span)))
+  (define replaced
+    (regexp-replace #px"\\{\\s*\\}\\s*$" snippet (format "{~a}" new-str)))
+  (define new-bs (bytes-append before
+                               (string->bytes/utf-8 replaced)
                                after))
   (call-with-output-file path
     #:exists 'truncate/replace
@@ -217,7 +235,19 @@
                    #,span
                    #:strict s?)]
     [(_ expr (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f])))
-     #'(run-expect (lambda () expr) "" #f 0 0 #:strict s?)]))
+     (define src (syntax-source stx))
+     (define pos (syntax-position stx))
+     (define span (syntax-span stx))
+     (define snippet
+       (and src pos span
+            (substring (file->string src)
+                      (sub1 pos)
+                      (+ (sub1 pos) span))))
+     (define has-empty?
+       (and snippet (regexp-match? #px"\\{\\s*\\}\\s*$" snippet)))
+     (if has-empty?
+         #`(run-expect (lambda () expr) "" #,(path->string src) #,pos #,span update-file-empty #:strict s?)
+         #'(run-expect (lambda () expr) "" #f 0 0 #:strict s?))]))
 
 (define-syntax (expect-file stx)
   (syntax-parse stx
@@ -253,5 +283,17 @@
                        #,span
                        #:strict s?)]
     [(_ expr (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f])))
-     #'(run-expect-exn (lambda () expr) "" #f 0 0 #:strict s?)]))
+     (define src (syntax-source stx))
+     (define pos (syntax-position stx))
+     (define span (syntax-span stx))
+     (define snippet
+       (and src pos span
+            (substring (file->string src)
+                      (sub1 pos)
+                      (+ (sub1 pos) span))))
+     (define has-empty?
+       (and snippet (regexp-match? #px"\\{\\s*\\}\\s*$" snippet)))
+     (if has-empty?
+         #`(run-expect-exn (lambda () expr) "" #,(path->string src) #,pos #,span update-file-empty #:strict s?)
+         #'(run-expect-exn (lambda () expr) "" #f 0 0 #:strict s?))]))
 
