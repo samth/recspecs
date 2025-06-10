@@ -50,13 +50,32 @@
 
 (define (update-file path pos span new-str)
   ;; Replace the expectation string located at [pos, pos+span) in the file
-  ;; at `path` with the printed representation of `new-str`.
+  ;; at `path` with `new-str`.  If the original source used a quoted
+  ;; Racket string, keep using the printed string form.  Otherwise insert
+  ;; the raw text.  This avoids introducing double quotes when updating
+  ;; expectations written with the @-syntax from `#lang at-exp`.
   (define bs (file->bytes path))
   (define start (sub1 pos))
   (define before (subbytes bs 0 start))
+  (define orig-bs (subbytes bs start (+ start span)))
   (define after (subbytes bs (+ start span)))
+  (define orig (bytes->string/utf-8 orig-bs))
+  ;; If the original text was written as a Racket string, it will start
+  ;; and end with a double quote character (possibly surrounded by
+  ;; whitespace).  Detect that so we know whether to emit the printed
+  ;; representation or the raw text.
+  (define (quoted-string? s)
+    (let ([t (string-trim s)])
+      (and (>= (string-length t) 2)
+           (char=? (string-ref t 0) #\")
+           (char=? (string-ref t (sub1 (string-length t))) #\"))))
+  (define quoting? (quoted-string? orig))
+  (define replacement
+    (if quoting?
+        (format "~s" new-str)
+        new-str))
   (define new-bs (bytes-append before
-                               (string->bytes/utf-8 (format "~s" new-str))
+                               (string->bytes/utf-8 replacement)
                                after))
   (call-with-output-file path
     #:exists 'truncate/replace
