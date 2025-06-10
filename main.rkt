@@ -6,6 +6,7 @@
          racket/string
          racket/vector
          racket/match
+         racket/path
          rackunit
          (for-syntax racket/base
                      syntax/parse
@@ -271,7 +272,8 @@
 (define-syntax (expect-file stx)
   (syntax-parse stx
     [(_ expr path:str (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f])))
-     #'(let ([p path])
+     #'(let* ([p path]
+              [p (if (path? p) p (string->path p))])
          (run-expect (lambda () expr)
                      (call-with-input-file p port->string)
                      (path->string p)
