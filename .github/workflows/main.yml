@@ -14,8 +14,8 @@ jobs:
           version: stable
           distribution: full
           architecture: x64
-      - name: Install package
-        run: raco pkg install --auto
+      - name: Install packages
+        run: raco pkg install --auto ./recspecs-lib ./recspecs
       - name: Build package
         run: raco setup --check-pkg-deps --unused-pkg-deps recspecs
       - name: Run tests
