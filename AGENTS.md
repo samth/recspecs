@@ -20,10 +20,10 @@
 * find all documentation for Racket and Racket packages at https://docs.racket-lang.org
 
 # Code style
-* run `raco fmt -i <filename>` to format a file properly
+* run `raco fmt -i <filename>` to format a file properly. Run this only for `.rkt` files.
 * prefer `let loop` over defining a single use recursive function
   
 # PR instructions
-* don't include test output in the PR description
+* don't include information about tests run in the PR description
 
 
