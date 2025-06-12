@@ -18,7 +18,8 @@
          expect-exn
          expect-unreachable
          recspecs-verbose?
-         recspecs-output-filter)
+         recspecs-output-filter
+         capture-output)
 
 ;; When enabled, expectation output is printed to the actual output
 ;; port as it is produced. The parameter defaults to #t when the
@@ -28,6 +29,18 @@
 ;; A procedure applied to the captured output before it is compared or
 ;; written back to a file. The parameter defaults to the identity function.
 (define recspecs-output-filter (make-parameter (lambda (s) s)))
+
+;; Run @racket[thunk] and return everything written to the current
+;; output port. When @racket[recspecs-verbose?] is true the output is
+;; also echoed to the original port.
+(define (capture-output thunk)
+  (define out (open-output-string))
+  (define base (current-output-port))
+  (parameterize ([current-output-port (if (recspecs-verbose?)
+                                          (combine-output base out)
+                                          out)])
+    (thunk)
+    (get-output-string out)))
 
 ;; Normalize a string by trimming leading and trailing whitespace and removing
 ;; common indentation from all lines. This is used when comparing expectation

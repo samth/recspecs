@@ -74,4 +74,12 @@ enabled, the form is replaced with @racket[expr] in the source instead of
 failing.
 }
 
+@defproc[(capture-output [thunk (-> any/c)]) string?]{
+Runs @racket[thunk] and returns everything printed to the current output
+port. When @racket[recspecs-verbose?] is true, the output is also echoed
+to the original port.
+
+@racketblock[(capture-output (lambda () (display "hi")))]
+}
+
 
