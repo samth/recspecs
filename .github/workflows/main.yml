@@ -19,4 +19,4 @@ jobs:
       - name: Build package
         run: raco setup --check-pkg-deps --unused-pkg-deps recspecs
       - name: Run tests
-        run: raco test -x -p recspecs
+        run: raco test -p recspecs
