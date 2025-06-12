@@ -26,6 +26,16 @@ provides @racketfont{recspecs-update-at-point}, which runs the current
 file under @exec{racket-test} with those environment variables set for
 the expectation at the cursor position.
 
+Output can be transformed before it is compared by parameterizing
+@racket[recspecs-output-filter]. The parameter holds a procedure that
+receives the captured string and returns a new string used for the
+comparison and when updating:
+
+@racketblock[
+  (parameterize ([recspecs-output-filter
+                  (lambda (s) (regexp-replace* #px"[0-9]+" s ""))])
+    (expect (display "v1.2") "v."))]
+
 @defform[(expect expr expected-str ...)]{
 Evaluates @racket[expr] and checks that the captured output is equal to
 the concatenation of @racket[expected-str]s. If they differ and

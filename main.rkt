@@ -16,12 +16,17 @@
 (provide expect
          expect-file
          expect-exn
-         recspecs-verbose?)
+         recspecs-verbose?
+         recspecs-output-filter)
 
 ;; When enabled, expectation output is printed to the actual output
 ;; port as it is produced. The parameter defaults to #t when the
 ;; `RECSPECS_VERBOSE` environment variable is set.
 (define recspecs-verbose? (make-parameter (and (getenv "RECSPECS_VERBOSE") #t)))
+
+;; A procedure applied to the captured output before it is compared or
+;; written back to a file. The parameter defaults to the identity function.
+(define recspecs-output-filter (make-parameter (lambda (s) s)))
 
 ;; Normalize a string by trimming leading and trailing whitespace and removing
 ;; common indentation from all lines. This is used when comparing expectation
@@ -167,12 +172,13 @@
   (test-case name
     (define out-str (open-output-string))
     (define base (current-output-port))
-    (define actual
+    (define raw
       (parameterize ([current-output-port (if (recspecs-verbose?)
                                               (combine-output base out-str)
                                               out-str)])
         (thunk)
         (get-output-string out-str)))
+    (define actual ((recspecs-output-filter) raw))
     (define comparator
       (if strict?
           string=?
@@ -198,7 +204,8 @@
     (with-handlers
         ([exn:fail?
           (lambda (e)
-            (define actual (exn-message e))
+            (define raw (exn-message e))
+            (define actual ((recspecs-output-filter) raw))
             (define comparator
               (if strict?
                   string=?
