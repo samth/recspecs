@@ -24,6 +24,7 @@ Additional forms mirror features from the OCaml and Rust libraries:
   name limits updates to only that expectation.
 * Set `RECSPECS_VERBOSE` or parameterize `recspecs-verbose?` to print
   captured output while tests run.
+* Use `capture-output` to run a thunk and return its printed output.
 
 ## Example
 
@@ -55,6 +56,12 @@ Mark code that should not run with `expect-unreachable`:
 ```racket
 (when #f
   (expect-unreachable (displayln "never")))
+```
+
+You can also capture output directly without an expectation:
+
+```racket
+(capture-output (lambda () (display "hi"))) ; => "hi"
 ```
 
 Run the file with `raco test` (or any RackUnit runner) to execute the
