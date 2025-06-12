@@ -14,6 +14,13 @@ diff is printed to help understand the mismatch. Updating can be
 restricted to a single test case by setting
 @tt{RECSPECS_UPDATE_TEST} to the name shown for that case.
 
+Verbose mode can be enabled by setting @tt{RECSPECS_VERBOSE} or by
+parameterizing @racket[recspecs-verbose?]. When enabled, captured
+output is echoed to the real output port as it is produced.
+For example:
+
+@verbatim|{RECSPECS_VERBOSE=1 raco test my-test.rkt}|
+
 For Emacs users, the accompanying @filepath{emacs/recspecs.el} file
 provides @racketfont{recspecs-update-at-point}, which runs the current
 file under @exec{racket-test} with those environment variables set for
