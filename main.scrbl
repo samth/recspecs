@@ -82,4 +82,33 @@ to the original port.
 @racketblock[(capture-output (lambda () (display "hi")))]
 }
 
+@defstruct[expectation ([out string?]
+                        [committed? boolean?]
+                        [skip? boolean?])]{
+Represents recorded output that can be committed or skipped. The
+structure is mutable so repeated @racket[with-expectation] blocks can
+append to @racket[out].}
+
+@defproc[(make-expectation) expectation?]{Create a fresh expectation.}
+
+@defproc[(commit-expectation! [e expectation?]) void?]{Mark @racket[e] as committed.}
+
+@defproc[(reset-expectation! [e expectation?]) void?]{Reset the output and flags of @racket[e].}
+
+@defproc[(skip-expectation! [e expectation?]) void?]{Mark @racket[e] as skipped.}
+
+@defform[(with-expectation e expr ...)]{
+Evaluates the @racket[expr]s and appends anything printed to
+@racket[e]'s @racket[out] field.}
+
+You can wrap any of the expectation forms with @racket[with-expectation] and
+access the captured output with @racket[expectation-out]:
+
+@racketblock[
+  (define log (make-expectation))
+  (with-expectation log
+    (expect (display "hi") "hi"))
+  (commit-expectation! log)
+  (displayln (expectation-out log))]
+
 

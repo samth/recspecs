@@ -17,9 +17,15 @@
          expect-file
          expect-exn
          expect-unreachable
+         (struct-out expectation)
+         make-expectation
+         commit-expectation!
+         reset-expectation!
+         skip-expectation!
          recspecs-verbose?
          recspecs-output-filter
-         capture-output)
+         capture-output
+         with-expectation)
 
 ;; When enabled, expectation output is printed to the actual output
 ;; port as it is produced. The parameter defaults to #t when the
@@ -34,13 +40,37 @@
 ;; output port. When @racket[recspecs-verbose?] is true the output is
 ;; also echoed to the original port.
 (define (capture-output thunk)
-  (define out (open-output-string))
-  (define base (current-output-port))
-  (parameterize ([current-output-port (if (recspecs-verbose?)
-                                          (combine-output base out)
-                                          out)])
-    (thunk)
-    (get-output-string out)))
+  (define e (make-expectation))
+  (with-expectation e (thunk))
+  (expectation-out e))
+
+;; ----------------------------------------------------------------------
+;; expectation struct and helpers
+
+(struct expectation (out committed? skip?) #:mutable)
+
+(define (make-expectation)
+  (expectation "" #f #f))
+
+(define (commit-expectation! e)
+  (set-expectation-committed?! e #t))
+
+(define (reset-expectation! e)
+  (set-expectation-out! e "")
+  (set-expectation-committed?! e #f)
+  (set-expectation-skip?! e #f))
+
+(define (skip-expectation! e)
+  (set-expectation-skip?! e #t))
+
+(define-syntax-rule (with-expectation e body ...)
+  (let ([out (open-output-string)]
+        [base (current-output-port)])
+    (parameterize ([current-output-port (if (recspecs-verbose?)
+                                            (combine-output base out)
+                                            out)])
+      body ...)
+    (set-expectation-out! e (string-append (expectation-out e) (get-output-string out)))))
 
 ;; Normalize a string by trimming leading and trailing whitespace and removing
 ;; common indentation from all lines. This is used when comparing expectation
@@ -193,15 +223,9 @@
         (format "~a:~a" path pos)
         "expect"))
   (test-case name
-    (define out-str (open-output-string))
-    (define base (current-output-port))
-    (define raw
-      (parameterize ([current-output-port (if (recspecs-verbose?)
-                                              (combine-output base out-str)
-                                              out-str)])
-        (thunk)
-        (get-output-string out-str)))
-    (define actual ((recspecs-output-filter) raw))
+    (define e (make-expectation))
+    (with-expectation e (thunk))
+    (define actual ((recspecs-output-filter) (expectation-out e)))
     (define comparator
       (if strict?
           string=?
@@ -210,9 +234,13 @@
     (cond
       [(and path (update-mode? name) (not equal?))
        (update path pos span actual)
+       (commit-expectation! e)
        (printf "Updated expectation in ~a\n" path)]
-      [equal? (check comparator expected actual)]
+      [equal?
+       (commit-expectation! e)
+       (check comparator expected actual)]
       [else
+       (skip-expectation! e)
        (define color? (and (terminal-port? (current-error-port)) (not (getenv "NO_COLOR"))))
        (displayln "Diff:" (current-error-port))
        (displayln (pretty-diff expected actual #:color? color?) (current-error-port))
@@ -224,29 +252,32 @@
         (format "~a:~a" path pos)
         "expect-exn"))
   (test-case name
-    (with-handlers
-        ([exn:fail?
-          (lambda (e)
-            (define raw (exn-message e))
-            (define actual ((recspecs-output-filter) raw))
-            (define comparator
-              (if strict?
-                  string=?
-                  (lambda (e a) (string=? (normalize-string a) (normalize-string e)))))
-            (define equal? (comparator expected actual))
-            (cond
-              [(and path (update-mode? name) (not equal?))
-               (update path pos span actual)
-               (printf "Updated expectation in ~a\n" path)]
-              [equal? (check comparator expected actual)]
-              [else
-               (define color? (and (terminal-port? (current-error-port)) (not (getenv "NO_COLOR"))))
-               (displayln "Diff:" (current-error-port))
-               (displayln (pretty-diff expected actual #:color? color?) (current-error-port))
-               (check comparator expected actual)]))])
+    (define e (make-expectation))
+    (with-handlers ([exn:fail? (lambda (ex) (set-expectation-out! e (exn-message ex)))])
       (begin
         (thunk)
-        (fail "expected an exception")))))
+        (skip-expectation! e)
+        (fail "expected an exception")))
+    (define actual ((recspecs-output-filter) (expectation-out e)))
+    (define comparator
+      (if strict?
+          string=?
+          (lambda (e a) (string=? (normalize-string a) (normalize-string e)))))
+    (define equal? (comparator expected actual))
+    (cond
+      [(and path (update-mode? name) (not equal?))
+       (update path pos span actual)
+       (commit-expectation! e)
+       (printf "Updated expectation in ~a\n" path)]
+      [equal?
+       (commit-expectation! e)
+       (check comparator expected actual)]
+      [else
+       (skip-expectation! e)
+       (define color? (and (terminal-port? (current-error-port)) (not (getenv "NO_COLOR"))))
+       (displayln "Diff:" (current-error-port))
+       (displayln (pretty-diff expected actual #:color? color?) (current-error-port))
+       (check comparator expected actual)])))
 
 ;; Produce a test that fails when evaluated. In update mode the form in the
 ;; source file is replaced with the printed expression instead of failing.
@@ -256,11 +287,15 @@
         (format "~a:~a" path pos)
         "expect-unreachable"))
   (test-case name
+    (define e (make-expectation))
     (cond
       [(and path (update-mode? name))
        (update-file-rewrite path pos span expr-str)
+       (commit-expectation! e)
        (printf "Updated expectation in ~a\n" path)]
-      [else (fail "unreachable expression evaluated")])))
+      [else
+       (skip-expectation! e)
+       (fail "unreachable expression evaluated")])))
 
 (define-syntax (expect stx)
   (syntax-parse stx
