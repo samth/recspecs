@@ -68,4 +68,10 @@ concatenation of @racket[expected-str]s. The message is updated when
 update mode is enabled.
 }
 
+@defform[(expect-unreachable expr)]{
+Fails the enclosing test if @racket[expr] evaluates. When update mode is
+enabled, the form is replaced with @racket[expr] in the source instead of
+failing.
+}
+
 

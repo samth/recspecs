@@ -16,6 +16,7 @@ Additional forms mirror features from the OCaml and Rust libraries:
   and rewrites that file when updating.
 * `expect-exn` checks that an expression raises an exception with a given
   message.
+* `expect-unreachable` fails if the wrapped expression is evaluated.
 * All expectation forms accept multiple string arguments which are
   concatenated together. This is handy when using
   `#lang at-exp` for multi-line expectations.
@@ -47,6 +48,13 @@ easier to write:
 @expect[(begin (displayln "hello") (displayln (+ 1 2)))]{
 hello
 3}
+```
+
+Mark code that should not run with `expect-unreachable`:
+
+```racket
+(when #f
+  (expect-unreachable (displayln "never")))
 ```
 
 Run the file with `raco test` (or any RackUnit runner) to execute the
