@@ -51,4 +51,11 @@ concatenation of @racket[expected-str]s. The message is updated when
 update mode is enabled.
 }
 
+@defproc[(capture-output [thunk (-> any/c)]) string?]{
+Runs @racket[thunk] and returns everything it prints to the current output
+port.
+
+@racketblock[(capture-output (lambda () (display "hi")))]
+}
+
 

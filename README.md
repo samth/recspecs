@@ -21,6 +21,7 @@ Additional forms mirror features from the OCaml and Rust libraries:
   `#lang at-exp` for multi-line expectations.
 * Setting the `RECSPECS_UPDATE_TEST` environment variable to a test case
   name limits updates to only that expectation.
+* `capture-output` runs a thunk and returns everything it prints.
 
 ## Example
 
@@ -45,6 +46,13 @@ easier to write:
 @expect[(begin (displayln "hello") (displayln (+ 1 2)))]{
 hello
 3}
+```
+
+The helper `capture-output` runs a thunk and returns everything it prints:
+
+```racket
+(capture-output (lambda () (display "hi")))
+;; => "hi"
 ```
 
 Run the file with `raco test` (or any RackUnit runner) to execute the
