@@ -64,6 +64,28 @@ You can also capture output directly without an expectation:
 (capture-output (lambda () (display "hi"))) ; => "hi"
 ```
 
+The library also exposes a mutable `expectation` value for recording
+output programmatically. Use `with-expectation` to capture output into the
+struct and call `commit-expectation!` or `skip-expectation!` to mark the
+result:
+
+```racket
+(define e (make-expectation))
+(with-expectation e (display "ok"))
+(commit-expectation! e)
+```
+
+`with-expectation` can also wrap other recspecs forms. The recorded output is
+available via @racket[expectation-out]:
+
+```racket
+(define log (make-expectation))
+(with-expectation log
+  (expect (display "hi") "hi"))
+(commit-expectation! log)
+(displayln (expectation-out log)) ; prints ""
+```
+
 Run the file with `raco test` (or any RackUnit runner) to execute the
 expectations. If they fail and you want to update the saved output, set
 `RECSPECS_UPDATE`:
