@@ -16,6 +16,7 @@
 (provide expect
          expect-file
          expect-exn
+         expect-unreachable
          recspecs-verbose?
          recspecs-output-filter)
 
@@ -102,6 +103,15 @@
 ;; Replace the entire file at `path` with `new-str`.
 (define (update-file-entire path _pos _span new-str)
   (call-with-output-file path #:exists 'truncate/replace (lambda (out) (display new-str out))))
+
+;; Replace the form at [pos, pos+span) with `new-str`.
+(define (update-file-rewrite path pos span new-str)
+  (define bs (file->bytes path))
+  (define start (sub1 pos))
+  (define before (subbytes bs 0 start))
+  (define after (subbytes bs (+ start span)))
+  (define new-bs (bytes-append before (string->bytes/utf-8 new-str) after))
+  (call-with-output-file path #:exists 'truncate/replace (lambda (out) (write-bytes new-bs out))))
 
 ;; Split a string into lines without dropping trailing empty lines
 (define (string->lines s)
@@ -225,6 +235,20 @@
         (thunk)
         (fail "expected an exception")))))
 
+;; Produce a test that fails when evaluated. In update mode the form in the
+;; source file is replaced with the printed expression instead of failing.
+(define (run-expect-unreachable expr-str path pos span)
+  (define name
+    (if path
+        (format "~a:~a" path pos)
+        "expect-unreachable"))
+  (test-case name
+    (cond
+      [(and path (update-mode? name))
+       (update-file-rewrite path pos span expr-str)
+       (printf "Updated expectation in ~a\n" path)]
+      [else (fail "unreachable expression evaluated")])))
+
 (define-syntax (expect stx)
   (syntax-parse stx
     [(_ expr
@@ -319,3 +343,12 @@
                            update-file-empty
                            #:strict s?)
          #'(run-expect-exn (lambda () expr) "" #f 0 0 #:strict s?))]))
+
+(define-syntax (expect-unreachable stx)
+  (syntax-parse stx
+    [(_ expr)
+     (define src (syntax-source stx))
+     (define pos (syntax-position stx))
+     (define span (syntax-span stx))
+     (define expr-str (format "~s" (syntax->datum #'expr)))
+     #`(run-expect-unreachable #,expr-str #,(and src (path->string src)) #,pos #,span)]))
