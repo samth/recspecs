@@ -24,6 +24,7 @@
          skip-expectation!
          recspecs-verbose?
          recspecs-output-filter
+         recspecs-runner
          capture-output
          with-expectation)
 
@@ -35,6 +36,11 @@
 ;; A procedure applied to the captured output before it is compared or
 ;; written back to a file. The parameter defaults to the identity function.
 (define recspecs-output-filter (make-parameter (lambda (s) s)))
+
+;; A procedure applied to the thunk for each expectation. The procedure
+;; receives a thunk and should call it to run the test expression.
+;; The default simply invokes the thunk.
+(define recspecs-runner (make-parameter (lambda (th) (th))))
 
 ;; Run @racket[thunk] and return everything written to the current
 ;; output port. When @racket[recspecs-verbose?] is true the output is
@@ -224,7 +230,7 @@
         "expect"))
   (test-case name
     (define e (make-expectation))
-    (with-expectation e (thunk))
+    (with-expectation e ((recspecs-runner) thunk))
     (define actual ((recspecs-output-filter) (expectation-out e)))
     (define comparator
       (if strict?
@@ -255,7 +261,7 @@
     (define e (make-expectation))
     (with-handlers ([exn:fail? (lambda (ex) (set-expectation-out! e (exn-message ex)))])
       (begin
-        (thunk)
+        ((recspecs-runner) thunk)
         (skip-expectation! e)
         (fail "expected an exception")))
     (define actual ((recspecs-output-filter) (expectation-out e)))

@@ -36,6 +36,24 @@ comparison and when updating:
                   (lambda (s) (regexp-replace* #px"[0-9]+" s ""))])
     (expect (display "v1.2") "v."))]
 
+The thunk that performs the test is executed via the procedure stored in
+@racket[recspecs-runner].  The default simply calls the thunk, but it can
+be replaced to control the runtime context. For example, limit memory
+usage with a new custodian and redirect the error port:
+
+@racketblock[
+  (parameterize ([recspecs-runner
+                  (lambda (th)
+                    (call-in-nested-thread
+                     (lambda ()
+                       (custodian-limit-memory (current-custodian) (* 1024 1024))
+                       (parameterize ([current-error-port (current-output-port)])
+                         (th)))))])
+    (expect (begin
+              (display "oops" (current-error-port))
+              (make-bytes (* 2 1024 1024)))
+            "oops"))]
+
 @defform[(expect expr expected-str ...)]{
 Evaluates @racket[expr] and checks that the captured output is equal to
 the concatenation of @racket[expected-str]s. If they differ and
