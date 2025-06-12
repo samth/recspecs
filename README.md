@@ -1,8 +1,8 @@
 # recspecs
 
 `recspecs` provides a lightweight expect testing facility for Racket. It is
-inspired by [Jane Street's `expect_test` for OCaml](https://github.com/janestreet/expect_test)
-and the [`expect-test` crate](https://github.com/greyblake/expect-test) for Rust.
+inspired by [Jane Street's `expect_test` for OCaml](https://github.com/janestreet/ppx_expect)
+and the [`expect-test` crate](https://github.com/rust-analyzer/expect-test) for Rust.
 
 Expect tests record the output of expressions directly in the source file.
 Each `expect` form expands to a small RackUnit test that compares the
