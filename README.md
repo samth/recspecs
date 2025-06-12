@@ -21,6 +21,8 @@ Additional forms mirror features from the OCaml and Rust libraries:
   `#lang at-exp` for multi-line expectations.
 * Setting the `RECSPECS_UPDATE_TEST` environment variable to a test case
   name limits updates to only that expectation.
+* Set `RECSPECS_VERBOSE` or parameterize `recspecs-verbose?` to print
+  captured output while tests run.
 
 ## Example
 
@@ -59,6 +61,12 @@ shown for that test case:
 
 ```console
 $ RECSPECS_UPDATE=1 RECSPECS_UPDATE_TEST=my-test.rkt:42 raco test my-test.rkt
+```
+
+Enable verbose output with:
+
+```console
+$ RECSPECS_VERBOSE=1 raco test my-test.rkt
 ```
 
 ### Emacs integration
