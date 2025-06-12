@@ -51,4 +51,16 @@ concatenation of @racket[expected-str]s. The message is updated when
 update mode is enabled.
 }
 
+@defparam[recspecs-output-filter filter (-> string? string?)]{
+A parameter whose value is applied to captured output and exception
+messages before they are compared against expectations.  Use this to
+strip nondeterministic data.
+
+@racketblock[
+  (parameterize ([recspecs-output-filter
+                  (lambda (s)
+                    (regexp-replace #px"timestamp: \\d+" s "timestamp: <ts>"))])
+    (expect (displayln "timestamp: 123") "timestamp: <ts>\n"))]
+}
+
 
