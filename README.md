@@ -131,7 +131,9 @@ The file `emacs/recspecs.el` defines a helper command
 `recspecs-update-at-point`.  When called from a buffer visiting a Racket
 file under `racket-mode`, it reruns that file with
 `RECSPECS_UPDATE` enabled and sets `RECSPECS_UPDATE_TEST` to the
-expectation at point so only that one is updated.
+expectation at point so only that one is updated.  After the test
+finishes, the buffer is automatically reverted to load any updated
+expectations from disk.
 
 ## Status
 
