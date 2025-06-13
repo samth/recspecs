@@ -55,8 +55,34 @@
                        "}\n"))
       (check-equal? (file->string tmp) expected))))
 
+;; Ensure that @expect works in `#lang at-exp racket/base` files
+(define at-exp-base-tests
+  (test-suite "at-exp-base-tests"
+    (test-case "updates at-exp racket/base"
+      (define tmp (make-temporary-file "base~a.rkt"))
+      (call-with-output-file tmp
+                             #:exists 'truncate/replace
+                             (lambda (out)
+                               (display "#lang at-exp racket/base\n" out)
+                               (display "(require recspecs)\n\n" out)
+                               (display "(expect (print 3) \"3\")\n\n" out)
+                               (display "@expect[(print 400)]{}\n" out)))
+      (define tmp-str (path->string tmp))
+      (putenv "RECSPECS_UPDATE" "1")
+      (putenv "RECSPECS_UPDATE_TEST" tmp-str)
+      (dynamic-require tmp #f)
+      (putenv "RECSPECS_UPDATE" "")
+      (putenv "RECSPECS_UPDATE_TEST" "")
+      (define expected
+        (string-append "#lang at-exp racket/base\n"
+                       "(require recspecs)\n\n"
+                       "(expect (print 3) \"3\")\n\n"
+                       "@expect[(print 400)]{400}\n"))
+      (check-equal? (file->string tmp) expected))))
+
 (module+ test
   (run-tests (test-suite "all"
                expect-tests
                expansion-tests
-               at-exp-empty-tests)))
+               at-exp-empty-tests
+               at-exp-base-tests)))
