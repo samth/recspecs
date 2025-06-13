@@ -48,8 +48,6 @@ expectation string.  Signal an error if none is found."
                     (format "RECSPECS_UPDATE_TEST=%s:%d" file pos)))
          (process-environment (append env process-environment)))
     (cond
-     ((fboundp 'racket-test) (racket-test))
-     ((fboundp 'racket-run) (racket-run))
      (t (compile (format "raco test %s" (shell-quote-argument file)))))))
 
 (provide 'recspecs)
