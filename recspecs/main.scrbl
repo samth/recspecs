@@ -28,7 +28,8 @@ the expectation at the cursor position.
 
 Use @racket[#:stderr? #t] with @racket[expect], @racket[expect-file],
 @racket[expect-exn], or @racket[capture-output] to record output written
-to the current error port instead of the output port.
+to the current error port instead of the output port. Pass
+@racket['both] to capture from both ports simultaneously.
 
 Output can be transformed before it is compared by parameterizing
 @racket[recspecs-output-filter]. The parameter holds a procedure that
@@ -96,11 +97,12 @@ enabled, the form is replaced with @racket[expr] in the source instead of
 failing.
 }
 
-@defproc[(capture-output [thunk (-> any/c)] [#:stderr? stderr? boolean? #f]) string?]{
-Runs @racket[thunk] and returns everything printed to the selected port.
+@defproc[(capture-output [thunk (-> any/c)] [#:stderr? stderr? any/c #f]) string?]{
+Runs @racket[thunk] and returns everything printed to the selected port(s).
 When @racket[stderr?] is @racket[#t], the current error port is captured
-instead of the output port. When @racket[recspecs-verbose?] is true, the
-output is also echoed to the original port.
+instead of the output port. Pass @racket['both] to capture from both ports.
+When @racket[recspecs-verbose?] is true, the output is also echoed to the
+original port(s).
 
 @racketblock[(capture-output (lambda () (display "hi")))]
 }
