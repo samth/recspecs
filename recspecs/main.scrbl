@@ -24,7 +24,9 @@ For example:
 For Emacs users, the accompanying @filepath{emacs/recspecs.el} file
 provides @racketfont{recspecs-update-at-point}, which runs the current
 file under @exec{racket-test} with those environment variables set for
-the expectation at the cursor position.
+the expectation at the cursor position. After the test finishes the
+buffer is automatically reverted so that any updated expectations are
+reloaded from disk.
 
 Use @racket[#:stderr? #t] with @racket[expect], @racket[expect-file],
 @racket[expect-exn], or @racket[capture-output] to record output written

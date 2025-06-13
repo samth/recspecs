@@ -6,7 +6,9 @@
 ;; The command works with racket-mode and calls `racket-test` when
 ;; available.  It sets the environment variables `RECSPECS_UPDATE` and
 ;; `RECSPECS_UPDATE_TEST` based on the current buffer and the location of
-;; the expectation string.
+;; the expectation string.  After the command finishes running the test,
+;; the buffer is automatically reverted so any updated expectations are
+;; loaded from disk.
 
 ;;; Code:
 
@@ -54,7 +56,14 @@ expectation string.  Signal an error if none is found."
          (pos (recspecs--expect-pos))
          (env (list "RECSPECS_UPDATE=1"
                     (format "RECSPECS_UPDATE_TEST=%s:%d" file pos)))
-         (process-environment (append env process-environment)))
+         (process-environment (append env process-environment))
+         (target (current-buffer))
+         hook)
+    (setq hook (lambda (_buf _msg)
+                 (with-current-buffer target
+                   (revert-buffer t t))
+                 (remove-hook 'compilation-finish-functions hook)))
+    (add-hook 'compilation-finish-functions hook)
     (cond
      (t (compile (format "raco test %s" (shell-quote-argument file)))))))
 
