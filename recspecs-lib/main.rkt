@@ -72,18 +72,27 @@
 (define-syntax (with-expectation stx)
   (syntax-parse stx
     [(_ e (~optional (~seq #:stderr? s?:expr) #:defaults ([s? #'#f])) body ...)
-     #`(let ([out (open-output-string)])
-         (if s?
-             (let ([base (current-error-port)])
-               (parameterize ([current-error-port (if (recspecs-verbose?)
-                                                      (combine-output base out)
-                                                      out)])
-                 body ...))
-             (let ([base (current-output-port)])
-               (parameterize ([current-output-port (if (recspecs-verbose?)
-                                                       (combine-output base out)
-                                                       out)])
-                 body ...)))
+     #'(let* ([stderr? s?]
+              [out (open-output-string)]
+              [base-out (current-output-port)]
+              [base-err (current-error-port)]
+              [port-out (if (recspecs-verbose?)
+                            (combine-output base-out out)
+                            out)]
+              [port-err (if (recspecs-verbose?)
+                            (combine-output base-err out)
+                            out)])
+         (cond
+           [(eq? stderr? 'both)
+            (parameterize ([current-output-port port-out]
+                           [current-error-port port-err])
+              body ...)]
+           [stderr?
+            (parameterize ([current-error-port port-err])
+              body ...)]
+           [else
+            (parameterize ([current-output-port port-out])
+              body ...)])
          (set-expectation-out! e (string-append (expectation-out e) (get-output-string out))))]))
 
 ;; Normalize a string by trimming leading and trailing whitespace and removing
