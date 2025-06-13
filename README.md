@@ -135,8 +135,8 @@ expectation at point so only that one is updated.
 
 ## Status
 
-This library is experimental but demonstrates the core API. It now shows a
-colorized diff when expectations fail and supports file based expectations
-and exception checks. Further features like tighter integration with
-rackunit can be added in the future.
+This library is new but relatively-feature complete. However, it hasn't
+been used in anger, so lots of things might change.
+
+Almost all the code here was written by the OpenAI Codex tool
 
