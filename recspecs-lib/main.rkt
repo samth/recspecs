@@ -45,9 +45,9 @@
 ;; Run @racket[thunk] and return everything written to the current
 ;; output port. When @racket[recspecs-verbose?] is true the output is
 ;; also echoed to the original port.
-(define (capture-output thunk)
+(define (capture-output thunk #:stderr? [stderr? #f])
   (define e (make-expectation))
-  (with-expectation e (thunk))
+  (with-expectation e #:stderr? stderr? (thunk))
   (expectation-out e))
 
 ;; ----------------------------------------------------------------------
@@ -69,14 +69,22 @@
 (define (skip-expectation! e)
   (set-expectation-skip?! e #t))
 
-(define-syntax-rule (with-expectation e body ...)
-  (let ([out (open-output-string)]
-        [base (current-output-port)])
-    (parameterize ([current-output-port (if (recspecs-verbose?)
-                                            (combine-output base out)
-                                            out)])
-      body ...)
-    (set-expectation-out! e (string-append (expectation-out e) (get-output-string out)))))
+(define-syntax (with-expectation stx)
+  (syntax-parse stx
+    [(_ e (~optional (~seq #:stderr? s?:expr) #:defaults ([s? #'#f])) body ...)
+     #`(let ([out (open-output-string)])
+         (if s?
+             (let ([base (current-error-port)])
+               (parameterize ([current-error-port (if (recspecs-verbose?)
+                                                      (combine-output base out)
+                                                      out)])
+                 body ...))
+             (let ([base (current-output-port)])
+               (parameterize ([current-output-port (if (recspecs-verbose?)
+                                                       (combine-output base out)
+                                                       out)])
+                 body ...)))
+         (set-expectation-out! e (string-append (expectation-out e) (get-output-string out))))]))
 
 ;; Normalize a string by trimming leading and trailing whitespace and removing
 ;; common indentation from all lines. This is used when comparing expectation
@@ -219,7 +227,14 @@
                    [(cons 'del l) (color "31" (string-append "- " l))]))
                "\n"))
 
-(define (run-expect thunk expected path pos span [update update-file] #:strict [strict? #f])
+(define (run-expect thunk
+                    expected
+                    path
+                    pos
+                    span
+                    [update update-file]
+                    #:strict [strict? #f]
+                    #:stderr? [stderr? #f])
   ;; Returns a rackunit test that evaluates `thunk`, captures anything printed
   ;; to the current output port and compares it to `expected`. When update mode
   ;; is enabled and the values differ, the source file is rewritten instead of
@@ -230,7 +245,7 @@
         "expect"))
   (test-case name
     (define e (make-expectation))
-    (with-expectation e ((recspecs-runner) thunk))
+    (with-expectation e #:stderr? stderr? ((recspecs-runner) thunk))
     (define actual ((recspecs-output-filter) (expectation-out e)))
     (define comparator
       (if strict?
@@ -252,7 +267,14 @@
        (displayln (pretty-diff expected actual #:color? color?) (current-error-port))
        (check comparator expected actual)])))
 
-(define (run-expect-exn thunk expected path pos span [update update-file] #:strict [strict? #f])
+(define (run-expect-exn thunk
+                        expected
+                        path
+                        pos
+                        span
+                        [update update-file]
+                        #:strict [strict? #f]
+                        #:stderr? [stderr? #f])
   (define name
     (if path
         (format "~a:~a" path pos)
@@ -308,7 +330,8 @@
     [(_ expr
         expected-first:str
         expected-rest:str ...
-        (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f])))
+        (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f]))
+        (~optional (~seq #:stderr? st?:expr) #:defaults ([st? #'#f])))
      (define expect-list (syntax->list #'(expected-first expected-rest ...)))
      (define first #'expected-first)
      (define last-syn
@@ -326,8 +349,11 @@
                    #,(and src (path->string src))
                    #,pos
                    #,span
-                   #:strict s?)]
-    [(_ expr (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f])))
+                   #:strict s?
+                   #:stderr? st?)]
+    [(_ expr
+        (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f]))
+        (~optional (~seq #:stderr? st?:expr) #:defaults ([st? #'#f])))
      (define src (syntax-source stx))
      (define pos (syntax-position stx))
      (define span (syntax-span stx))
@@ -340,12 +366,16 @@
                        #,pos
                        #,span
                        update-file-empty
-                       #:strict s?)
-         #'(run-expect (lambda () expr) "" #f 0 0 #:strict s?))]))
+                       #:strict s?
+                       #:stderr? st?)
+         #'(run-expect (lambda () expr) "" #f 0 0 #:strict s? #:stderr? st?))]))
 
 (define-syntax (expect-file stx)
   (syntax-parse stx
-    [(_ expr path:str (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f])))
+    [(_ expr
+        path:str
+        (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f]))
+        (~optional (~seq #:stderr? st?:expr) #:defaults ([st? #'#f])))
      #'(let* ([p path]
               [p (if (path? p)
                      p
@@ -356,14 +386,16 @@
                      0
                      0
                      update-file-entire
-                     #:strict s?))]))
+                     #:strict s?
+                     #:stderr? st?))]))
 
 (define-syntax (expect-exn stx)
   (syntax-parse stx
     [(_ expr
         expected-first:str
         expected-rest:str ...
-        (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f])))
+        (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f]))
+        (~optional (~seq #:stderr? st?:expr) #:defaults ([st? #'#f])))
      (define expect-list (syntax->list #'(expected-first expected-rest ...)))
      (define first #'expected-first)
      (define last-syn
@@ -381,8 +413,11 @@
                        #,(and src (path->string src))
                        #,pos
                        #,span
-                       #:strict s?)]
-    [(_ expr (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f])))
+                       #:strict s?
+                       #:stderr? st?)]
+    [(_ expr
+        (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f]))
+        (~optional (~seq #:stderr? st?:expr) #:defaults ([st? #'#f])))
      (define src (syntax-source stx))
      (define pos (syntax-position stx))
      (define span (syntax-span stx))
@@ -395,8 +430,9 @@
                            #,pos
                            #,span
                            update-file-empty
-                           #:strict s?)
-         #'(run-expect-exn (lambda () expr) "" #f 0 0 #:strict s?))]))
+                           #:strict s?
+                           #:stderr? st?)
+         #'(run-expect-exn (lambda () expr) "" #f 0 0 #:strict s? #:stderr? st?))]))
 
 (define-syntax (expect-unreachable stx)
   (syntax-parse stx

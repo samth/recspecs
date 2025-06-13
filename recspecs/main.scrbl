@@ -26,6 +26,10 @@ provides @racketfont{recspecs-update-at-point}, which runs the current
 file under @exec{racket-test} with those environment variables set for
 the expectation at the cursor position.
 
+Use @racket[#:stderr? #t] with @racket[expect], @racket[expect-file],
+@racket[expect-exn], or @racket[capture-output] to record output written
+to the current error port instead of the output port.
+
 Output can be transformed before it is compared by parameterizing
 @racket[recspecs-output-filter]. The parameter holds a procedure that
 receives the captured string and returns a new string used for the
@@ -92,10 +96,11 @@ enabled, the form is replaced with @racket[expr] in the source instead of
 failing.
 }
 
-@defproc[(capture-output [thunk (-> any/c)]) string?]{
-Runs @racket[thunk] and returns everything printed to the current output
-port. When @racket[recspecs-verbose?] is true, the output is also echoed
-to the original port.
+@defproc[(capture-output [thunk (-> any/c)] [#:stderr? stderr? boolean? #f]) string?]{
+Runs @racket[thunk] and returns everything printed to the selected port.
+When @racket[stderr?] is @racket[#t], the current error port is captured
+instead of the output port. When @racket[recspecs-verbose?] is true, the
+output is also echoed to the original port.
 
 @racketblock[(capture-output (lambda () (display "hi")))]
 }
