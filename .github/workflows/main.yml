@@ -14,9 +14,15 @@ jobs:
           version: stable
           distribution: full
           architecture: x64
+      - name: Install Emacs
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y emacs-nox
       - name: Install packages
         run: raco pkg install --auto ./recspecs-lib ./recspecs
       - name: Build package
         run: raco setup --check-pkg-deps --unused-pkg-deps recspecs
       - name: Run tests
         run: raco test -p recspecs recspecs-lib
+      - name: Run Emacs tests
+        run: emacs --batch -L emacs -l emacs/recspecs-tests.el -f ert-run-tests-batch-and-exit
