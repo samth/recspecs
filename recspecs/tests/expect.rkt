@@ -80,9 +80,32 @@
                        "@expect[(print 400)]{400}\n"))
       (check-equal? (file->string tmp) expected))))
 
+(define at-exp-newline-tests
+  (test-suite "at-exp-newline-tests"
+    (test-case "updates at-exp with newline"
+      (define tmp (make-temporary-file "newline~a.rkt"))
+      (call-with-output-file tmp
+                             #:exists 'truncate/replace
+                             (lambda (out)
+                               (display "#lang at-exp racket/base\n" out)
+                               (display "(require recspecs)\n\n" out)
+                               (display "@expect[(print 400)]{\n 4000\n}\n" out)))
+      (define tmp-str (path->string tmp))
+      (putenv "RECSPECS_UPDATE" "1")
+      (putenv "RECSPECS_UPDATE_TEST" tmp-str)
+      (dynamic-require tmp #f)
+      (putenv "RECSPECS_UPDATE" "")
+      (putenv "RECSPECS_UPDATE_TEST" "")
+      (define expected
+        (string-append "#lang at-exp racket/base\n"
+                       "(require recspecs)\n\n"
+                       "@expect[(print 400)]{\n 400\n}\n"))
+      (check-equal? (file->string tmp) expected))))
+
 (module+ test
   (run-tests (test-suite "all"
                expect-tests
                expansion-tests
                at-exp-empty-tests
-               at-exp-base-tests)))
+               at-exp-base-tests
+               at-exp-newline-tests)))
