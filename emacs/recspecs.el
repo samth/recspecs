@@ -20,8 +20,8 @@ Searches backward for an `expect` form and returns the position of its
 expectation string.  Signal an error if none is found."
   (save-excursion
     (let ((table (copy-syntax-table)))
-      (modify-syntax-entry ?[ "(" table)
-      (modify-syntax-entry ?] ")" table)
+      (modify-syntax-entry ?\[ "(" table)
+      (modify-syntax-entry ?\] ")" table)
       (with-syntax-table table
         (unless (re-search-backward
                  (rx (or (seq "("
@@ -40,17 +40,17 @@ expectation string.  Signal an error if none is found."
           (when (looking-at "(")
             (forward-char 1)) ;; skip opening paren if present
           (forward-symbol 1) ;; skip expect / expect-exn / expect-file
-          (skip-chars-forward "\s-")
+          (skip-chars-forward " \t\n")
           (forward-sexp 1) ;; expression or path
-          (skip-chars-forward "\s-")
+          (skip-chars-forward " \t\n")
           (if (looking-at "{")
               (progn
                 (forward-char 1)
-                (skip-chars-forward "\s-")
+                (skip-chars-forward " \t\n")
                 (if (looking-at "}")
                     start
                   (point)))
-            (point))))))
+            (point)))))))
 
 ;;;###autoload
 (defun recspecs-update-at-point ()
@@ -69,7 +69,8 @@ expectation string.  Signal an error if none is found."
                  (remove-hook 'compilation-finish-functions hook)))
     (add-hook 'compilation-finish-functions hook)
     (cond
-     (t (compile (format "raco test %s" (shell-quote-argument file)))))))
+     (t (compile (format "raco test %s" (shell-quote-argument file))))))
+  )
 
 (provide 'recspecs)
 
