@@ -83,6 +83,31 @@ You can also capture output directly without an expectation:
                #:stderr? 'both) ; => "warnout"
 ```
 
+### Additional examples
+
+Store expectations in a separate file with `expect-file`:
+
+```racket
+(expect-file
+  (begin
+    (displayln "hello")
+    (displayln "world"))
+  "expected.txt")
+```
+
+Check exception messages using `expect-exn`:
+
+```racket
+(expect-exn (raise-user-error "bad") "bad")
+```
+
+Transform output before comparison with `recspecs-output-filter`:
+
+```racket
+(parameterize ([recspecs-output-filter string-upcase])
+  (expect (display "ok") "OK"))
+```
+
 The library also exposes a mutable `expectation` value for recording
 output programmatically. Use `with-expectation` to capture output into the
 struct and call `commit-expectation!` or `skip-expectation!` to mark the
