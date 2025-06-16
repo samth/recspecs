@@ -1,7 +1,7 @@
 # Building
 * recompile with `raco setup -D recspecs` 
 * recompile individual files that are changed with `raco make <filepath>`
-* rebuild documentation with `raco setup specs`
+* rebuild documentation with `raco setup recspecs`
 * when new dependencies are added, update `info.rkt` by running `raco setup --fix-pkg-deps recspecs`
 * If you need to install a new package, install it with `raco pkg install <pkg>`
 * check the syntax of an individual file by running `raco make <filename>`
