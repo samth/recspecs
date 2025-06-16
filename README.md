@@ -108,6 +108,21 @@ Transform output before comparison with `recspecs-output-filter`:
   (expect (display "ok") "OK"))
 ```
 
+Trim whitespace before checking the result:
+
+```racket
+(parameterize ([recspecs-output-filter string-trim])
+  (expect (display "  hi  ") "hi"))
+```
+
+Remove digits entirely:
+
+```racket
+(parameterize ([recspecs-output-filter
+                (lambda (s) (regexp-replace* #px"[0-9]+" s ""))])
+  (expect (display "v1.2") "v."))
+```
+
 The library also exposes a mutable `expectation` value for recording
 output programmatically. Use `with-expectation` to capture output into the
 struct and call `commit-expectation!` or `skip-expectation!` to mark the
