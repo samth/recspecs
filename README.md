@@ -175,6 +175,9 @@ expectation at point so only that one is updated.  After the test
 finishes, the buffer is automatically reverted to load any updated
 expectations from disk.
 
+To enable this, add `(load "<path-to-this-code>/emacs/recspecs.el")`
+to your `.emacs` file.
+
 ## Status
 
 This library is new but relatively-feature complete. However, it hasn't
