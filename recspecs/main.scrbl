@@ -86,12 +86,21 @@ expectations:
 Reads the expectation from @racket[path-str] instead of embedding it in the
 source. The file is replaced with new output when @tt{RECSPECS_UPDATE} is set.
 }
+@racketblock[
+  (expect-file
+    (begin
+      (displayln "hello")
+      (displayln "world"))
+    "expected.txt")]
 
 @defform[(expect-exn expr expected-str ...)]{
 Checks that @racket[expr] raises an exception whose message matches the
 concatenation of @racket[expected-str]s. The message is updated when
 update mode is enabled.
 }
+@racketblock[
+  (expect-exn (raise-user-error "bad")
+              "bad")]
 
 @defform[(expect-unreachable expr)]{
 Fails the enclosing test if @racket[expr] evaluates. When update mode is
