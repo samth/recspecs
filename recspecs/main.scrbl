@@ -42,6 +42,12 @@ comparison and when updating:
   (parameterize ([recspecs-output-filter
                   (lambda (s) (regexp-replace* #px"[0-9]+" s ""))])
     (expect (display "v1.2") "v."))]
+@racketblock[
+  (parameterize ([recspecs-output-filter string-upcase])
+    (expect (display "ok") "OK"))]
+@racketblock[
+  (parameterize ([recspecs-output-filter string-trim])
+    (expect (display "  hi  ") "hi"))]
 
 The thunk that performs the test is executed via the procedure stored in
 @racket[recspecs-runner].  The default simply calls the thunk, but it can
@@ -107,6 +113,9 @@ Fails the enclosing test if @racket[expr] evaluates. When update mode is
 enabled, the form is replaced with @racket[expr] in the source instead of
 failing.
 }
+@racketblock[
+  (when #f
+    (expect-unreachable (displayln "never")))]
 
 @defproc[(capture-output [thunk (-> any/c)] [#:stderr? stderr? any/c #f]) string?]{
 Runs @racket[thunk] and returns everything printed to the selected port(s).
@@ -116,6 +125,12 @@ When @racket[recspecs-verbose?] is true, the output is also echoed to the
 original port(s).
 
 @racketblock[(capture-output (lambda () (display "hi")))]
+@racketblock[(capture-output (lambda () (display "err" (current-error-port)))
+            #:stderr? #t)]
+@racketblock[(capture-output (lambda ()
+              (display "warn" (current-error-port))
+              (display "out"))
+            #:stderr? 'both)]
 }
 
 @defstruct[expectation ([out string?]
