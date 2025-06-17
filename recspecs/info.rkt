@@ -7,3 +7,5 @@
 (define deps (list "recspecs-lib" "rackunit-lib" "scribble-lib" "base" "at-exp-lib"))
 
 (define build-deps (list "racket-doc" "scribble-doc"))
+
+(define license '(Apache-2.0))
