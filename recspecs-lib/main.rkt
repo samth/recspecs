@@ -8,8 +8,10 @@
          racket/match
          racket/path
          rackunit
+         racket/contract
          (for-syntax racket/base
                      syntax/parse
+                     syntax/parse/experimental/contract
                      racket/list
                      racket/file))
 
@@ -17,16 +19,17 @@
          expect-file
          expect-exn
          expect-unreachable
-         (struct-out expectation)
-         make-expectation
-         commit-expectation!
-         reset-expectation!
-         skip-expectation!
-         recspecs-verbose?
-         recspecs-output-filter
-         recspecs-runner
-         capture-output
-         with-expectation)
+         with-expectation
+         (contract-out (struct expectation ([out string?] [committed? boolean?] [skip? boolean?]))
+                       [make-expectation (-> expectation?)]
+                       [commit-expectation! (-> expectation? void?)]
+                       [reset-expectation! (-> expectation? void?)]
+                       [skip-expectation! (-> expectation? void?)]
+                       [recspecs-verbose? (parameter/c boolean?)]
+                       [recspecs-output-filter (parameter/c (-> string? string?))]
+                       [recspecs-runner (parameter/c (-> (-> any/c) any/c))]
+                       [capture-output
+                        (->* ((-> any/c)) (#:stderr? (or/c boolean? (symbols 'both))) string?)]))
 
 ;; When enabled, expectation output is printed to the actual output
 ;; port as it is produced. The parameter defaults to #t when the
@@ -339,8 +342,11 @@
     [(_ expr
         expected-first:str
         expected-rest:str ...
-        (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f]))
-        (~optional (~seq #:stderr? st?:expr) #:defaults ([st? #'#f])))
+        (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
+        (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
+     #:declare expr (expr/c #'any/c)
+     #:declare s? (expr/c #'boolean?)
+     #:declare st? (expr/c #'(or/c boolean? (symbols 'both)))
      (define expect-list (syntax->list #'(expected-first expected-rest ...)))
      (define first #'expected-first)
      (define last-syn
@@ -361,8 +367,11 @@
                    #:strict s?
                    #:stderr? st?)]
     [(_ expr
-        (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f]))
-        (~optional (~seq #:stderr? st?:expr) #:defaults ([st? #'#f])))
+        (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
+        (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
+     #:declare expr (expr/c #'any/c)
+     #:declare s? (expr/c #'boolean?)
+     #:declare st? (expr/c #'(or/c boolean? (symbols 'both)))
      (define src (syntax-source stx))
      (define pos (syntax-position stx))
      (define span (syntax-span stx))
@@ -383,8 +392,11 @@
   (syntax-parse stx
     [(_ expr
         path:str
-        (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f]))
-        (~optional (~seq #:stderr? st?:expr) #:defaults ([st? #'#f])))
+        (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
+        (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
+     #:declare expr (expr/c #'any/c)
+     #:declare s? (expr/c #'boolean?)
+     #:declare st? (expr/c #'(or/c boolean? (symbols 'both)))
      #'(let* ([p path]
               [p (if (path? p)
                      p
@@ -403,8 +415,11 @@
     [(_ expr
         expected-first:str
         expected-rest:str ...
-        (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f]))
-        (~optional (~seq #:stderr? st?:expr) #:defaults ([st? #'#f])))
+        (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
+        (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
+     #:declare expr (expr/c #'any/c)
+     #:declare s? (expr/c #'boolean?)
+     #:declare st? (expr/c #'(or/c boolean? (symbols 'both)))
      (define expect-list (syntax->list #'(expected-first expected-rest ...)))
      (define first #'expected-first)
      (define last-syn
@@ -425,8 +440,11 @@
                        #:strict s?
                        #:stderr? st?)]
     [(_ expr
-        (~optional (~seq #:strict? s?:expr) #:defaults ([s? #'#f]))
-        (~optional (~seq #:stderr? st?:expr) #:defaults ([st? #'#f])))
+        (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
+        (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
+     #:declare expr (expr/c #'any/c)
+     #:declare s? (expr/c #'boolean?)
+     #:declare st? (expr/c #'(or/c boolean? (symbols 'both)))
      (define src (syntax-source stx))
      (define pos (syntax-position stx))
      (define span (syntax-span stx))
@@ -446,6 +464,7 @@
 (define-syntax (expect-unreachable stx)
   (syntax-parse stx
     [(_ expr)
+     #:declare expr (expr/c #'any/c)
      (define src (syntax-source stx))
      (define pos (syntax-position stx))
      (define span (syntax-span stx))
