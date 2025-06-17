@@ -163,3 +163,39 @@ access the captured output with @racket[expectation-out]:
   (displayln (expectation-out log))]
 
 
+@defproc[(run-expect
+          [thunk (-> any/c)]
+          [expected string?]
+          [path (or/c path-string? #f)]
+          [pos exact-nonnegative-integer?]
+          [span exact-nonnegative-integer?]
+          [#:strict strict? boolean? #f]
+          [#:stderr? stderr? (or/c boolean? (symbols 'both))])
+         void?]{
+Runs @racket[thunk] and checks that the captured output matches
+@racket[expected].  The @racket[path], @racket[pos] and @racket[span]
+identify the source location used when updating.
+}
+
+@defproc[(run-expect-exn
+          [thunk (-> any/c)]
+          [expected string?]
+          [path (or/c path-string? #f)]
+          [pos exact-nonnegative-integer?]
+          [span exact-nonnegative-integer?]
+          [#:strict strict? boolean? #f]
+          [#:stderr? stderr? (or/c boolean? (symbols 'both))])
+         void?]{
+Like @racket[run-expect] but expects @racket[thunk] to raise an
+exception whose message matches @racket[expected].
+}
+
+@defproc[(update-file-entire
+          [path path-string?]
+          [pos exact-nonnegative-integer?]
+          [span exact-nonnegative-integer?]
+          [new-str string?])
+         void?]{
+Replace the entire file at @racket[path] with @racket[new-str].
+}
+

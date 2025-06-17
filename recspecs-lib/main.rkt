@@ -19,6 +19,10 @@
          expect-file
          expect-exn
          expect-unreachable
+         run-expect
+         run-expect-exn
+         run-expect-unreachable
+         update-file-entire
          with-expectation
          (contract-out (struct expectation ([out string?] [committed? boolean?] [skip? boolean?]))
                        [make-expectation (-> expectation?)]
@@ -367,6 +371,15 @@
                    #:strict s?
                    #:stderr? st?)]
     [(_ expr
+        expected
+        (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
+        (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
+     #:declare expr (expr/c #'any/c)
+     #:declare expected (expr/c #'string?)
+     #:declare s? (expr/c #'boolean?)
+     #:declare st? (expr/c #'(or/c boolean? (symbols 'both)))
+     #'(run-expect (lambda () expr) expected #f 0 0 #:strict s? #:stderr? st?)]
+    [(_ expr
         (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
         (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
      #:declare expr (expr/c #'any/c)
@@ -408,6 +421,26 @@
                      0
                      update-file-entire
                      #:strict s?
+                     #:stderr? st?))]
+    [(_ expr
+        path-exp
+        (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
+        (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
+     #:declare expr (expr/c #'any/c)
+     #:declare path-exp (expr/c #'path-string?)
+     #:declare s? (expr/c #'boolean?)
+     #:declare st? (expr/c #'(or/c boolean? (symbols 'both)))
+     #'(let* ([p path-exp]
+              [p (if (path? p)
+                     p
+                     (string->path p))])
+         (run-expect (lambda () expr)
+                     (call-with-input-file p port->string)
+                     (path->string p)
+                     0
+                     0
+                     update-file-entire
+                     #:strict s?
                      #:stderr? st?))]))
 
 (define-syntax (expect-exn stx)
@@ -439,6 +472,15 @@
                        #,span
                        #:strict s?
                        #:stderr? st?)]
+    [(_ expr
+        expected
+        (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
+        (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
+     #:declare expr (expr/c #'any/c)
+     #:declare expected (expr/c #'string?)
+     #:declare s? (expr/c #'boolean?)
+     #:declare st? (expr/c #'(or/c boolean? (symbols 'both)))
+     #'(run-expect-exn (lambda () expr) expected #f 0 0 #:strict s? #:stderr? st?)]
     [(_ expr
         (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
         (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
