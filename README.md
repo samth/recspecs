@@ -24,7 +24,7 @@ Additional forms mirror features from the OCaml and Rust libraries:
   name limits updates to only that expectation.
 * Set `RECSPECS_VERBOSE` or parameterize `recspecs-verbose?` to print
   captured output while tests run.
-* Pass `#:stderr? #t` to capture output from `current-error-port` in
+* Pass `#:port 'stderr` to capture output from `current-error-port` in
   `expect`, `expect-file`, `expect-exn`, or `capture-output`. Use `'both`
   to capture from both output ports at once.
 * Use `capture-output` to run a thunk and return its printed output.
@@ -43,13 +43,13 @@ Additional forms mirror features from the OCaml and Rust libraries:
 
 (expect (display "oops" (current-error-port))
         "oops"
-        #:stderr? #t)
+        #:port 'stderr)
 
 (expect (begin
           (display "warn" (current-error-port))
           (display "out"))
         "warnout"
-        #:stderr? 'both)
+        #:port 'both)
 ```
 
 Using @ expressions from `#lang at-exp` can make multi-line output
@@ -76,11 +76,11 @@ You can also capture output directly without an expectation:
 ```racket
 (capture-output (lambda () (display "hi"))) ; => "hi"
 (capture-output (lambda () (display "err" (current-error-port)))
-               #:stderr? #t) ; => "err"
+               #:port 'stderr) ; => "err"
 (capture-output (lambda ()
                   (display "warn" (current-error-port))
                   (display "out"))
-               #:stderr? 'both) ; => "warnout"
+               #:port 'both) ; => "warnout"
 ```
 
 ### Additional examples

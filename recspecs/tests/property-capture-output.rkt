@@ -9,14 +9,14 @@
 
 (define prop-capture-stderr
   (property ([s (gen:string)])
-            (string=? (capture-output (lambda () (display s (current-error-port))) #:stderr? #t) s)))
+            (string=? (capture-output (lambda () (display s (current-error-port))) #:port 'stderr) s)))
 
 (define prop-capture-both
   (property ([s1 (gen:string)] [s2 (gen:string)])
             (string=? (capture-output (lambda ()
                                         (display s1 (current-error-port))
                                         (display s2))
-                                      #:stderr? 'both)
+                                      #:port 'both)
                       (string-append s1 s2))))
 
 ;; Non-string values
@@ -26,7 +26,7 @@
 
 (define prop-capture-number-stderr
   (property ([n (gen:integer-in -1000 1000)])
-            (string=? (capture-output (lambda () (display n (current-error-port))) #:stderr? #t)
+            (string=? (capture-output (lambda () (display n (current-error-port))) #:port 'stderr)
                       (number->string n))))
 
 (define prop-capture-number-both
@@ -34,7 +34,7 @@
             (string=? (capture-output (lambda ()
                                         (display n1 (current-error-port))
                                         (display n2))
-                                      #:stderr? 'both)
+                                      #:port 'both)
                       (string-append (number->string n1) (number->string n2)))))
 
 (define property-tests
