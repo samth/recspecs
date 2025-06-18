@@ -11,7 +11,7 @@
       (check-equal? (capture-output (lambda ()
                                       (display "err" (current-error-port))
                                       (display "out"))
-                                    #:stderr? 'both)
+                                    #:port 'both)
                     "errout"))))
 
 (module+ test

@@ -28,7 +28,7 @@ the expectation at the cursor position. After the test finishes the
 buffer is automatically reverted so that any updated expectations are
 reloaded from disk.
 
-Use @racket[#:stderr? #t] with @racket[expect], @racket[expect-file],
+Use @racket[#:port 'stderr] with @racket[expect], @racket[expect-file],
 @racket[expect-exn], or @racket[capture-output] to record output written
 to the current error port instead of the output port. Pass
 @racket['both] to capture from both ports simultaneously.
@@ -117,20 +117,20 @@ failing.
   (when #f
     (expect-unreachable (displayln "never")))]
 
-@defproc[(capture-output [thunk (-> any/c)] [#:stderr? stderr? any/c #f]) string?]{
+@defproc[(capture-output [thunk (-> any/c)] [#:port port any/c 'stdout]) string?]{
 Runs @racket[thunk] and returns everything printed to the selected port(s).
-When @racket[stderr?] is @racket[#t], the current error port is captured
+When @racket[port] is @racket['stderr], the current error port is captured
 instead of the output port. Pass @racket['both] to capture from both ports.
 When @racket[recspecs-verbose?] is true, the output is also echoed to the
 original port(s).
 
 @racketblock[(capture-output (lambda () (display "hi")))]
 @racketblock[(capture-output (lambda () (display "err" (current-error-port)))
-            #:stderr? #t)]
+            #:port 'stderr)]
 @racketblock[(capture-output (lambda ()
               (display "warn" (current-error-port))
               (display "out"))
-            #:stderr? 'both)]
+            #:port 'both)]
 }
 
 @defstruct[expectation ([out string?]
@@ -170,7 +170,7 @@ access the captured output with @racket[expectation-out]:
           [pos exact-nonnegative-integer?]
           [span exact-nonnegative-integer?]
           [#:strict strict? boolean? #f]
-          [#:stderr? stderr? (or/c boolean? (symbols 'both))])
+          [#:port port (symbols 'stdout 'stderr 'both) 'stdout])
          void?]{
 Runs @racket[thunk] and checks that the captured output matches
 @racket[expected].  The @racket[path], @racket[pos] and @racket[span]
@@ -184,7 +184,7 @@ identify the source location used when updating.
           [pos exact-nonnegative-integer?]
           [span exact-nonnegative-integer?]
           [#:strict strict? boolean? #f]
-          [#:stderr? stderr? (or/c boolean? (symbols 'both))])
+          [#:port port (symbols 'stdout 'stderr 'both) 'stdout])
          void?]{
 Like @racket[run-expect] but expects @racket[thunk] to raise an
 exception whose message matches @racket[expected].

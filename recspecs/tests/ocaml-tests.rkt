@@ -50,12 +50,12 @@
 
 (define ocaml-stderr-tests
   (test-suite "ocaml-stderr-tests"
-    (expect (display "err" (current-error-port)) "err" #:stderr? #t)
+    (expect (display "err" (current-error-port)) "err" #:port 'stderr)
     (expect (begin
               (display "out")
               (display "err" (current-error-port)))
             "outerr"
-            #:stderr? 'both)))
+            #:port 'both)))
 
 (define ocaml-multi-string-tests
   (test-suite "ocaml-multi-string-tests"

@@ -33,7 +33,7 @@
                        [recspecs-output-filter (parameter/c (-> string? string?))]
                        [recspecs-runner (parameter/c (-> (-> any/c) any/c))]
                        [capture-output
-                        (->* ((-> any/c)) (#:stderr? (or/c boolean? (symbols 'both))) string?)]))
+                        (->* ((-> any/c)) (#:port (symbols 'stdout 'stderr 'both)) string?)]))
 
 ;; When enabled, expectation output is printed to the actual output
 ;; port as it is produced. The parameter defaults to #t when the
@@ -52,9 +52,9 @@
 ;; Run @racket[thunk] and return everything written to the current
 ;; output port. When @racket[recspecs-verbose?] is true the output is
 ;; also echoed to the original port.
-(define (capture-output thunk #:stderr? [stderr? #f])
+(define (capture-output thunk #:port [port 'stdout])
   (define e (make-expectation))
-  (with-expectation e #:stderr? stderr? (thunk))
+  (with-expectation e #:port port (thunk))
   (expectation-out e))
 
 ;; ----------------------------------------------------------------------
@@ -78,8 +78,8 @@
 
 (define-syntax (with-expectation stx)
   (syntax-parse stx
-    [(_ e (~optional (~seq #:stderr? s?:expr) #:defaults ([s? #'#f])) body ...)
-     #'(let* ([stderr? s?]
+    [(_ e (~optional (~seq #:port p?:expr) #:defaults ([p? #''stdout])) body ...)
+     #'(let* ([port p?]
               [out (open-output-string)]
               [base-out (current-output-port)]
               [base-err (current-error-port)]
@@ -90,11 +90,11 @@
                             (combine-output base-err out)
                             out)])
          (cond
-           [(eq? stderr? 'both)
+           [(eq? port 'both)
             (parameterize ([current-output-port port-out]
                            [current-error-port port-err])
               body ...)]
-           [stderr?
+           [(eq? port 'stderr)
             (parameterize ([current-error-port port-err])
               body ...)]
            [else
@@ -250,7 +250,7 @@
                     span
                     [update update-file]
                     #:strict [strict? #f]
-                    #:stderr? [stderr? #f])
+                    #:port [port 'stdout])
   ;; Returns a rackunit test that evaluates `thunk`, captures anything printed
   ;; to the current output port and compares it to `expected`. When update mode
   ;; is enabled and the values differ, the source file is rewritten instead of
@@ -261,7 +261,7 @@
         "expect"))
   (test-case name
     (define e (make-expectation))
-    (with-expectation e #:stderr? stderr? ((recspecs-runner) thunk))
+    (with-expectation e #:port port ((recspecs-runner) thunk))
     (define actual ((recspecs-output-filter) (expectation-out e)))
     (define comparator
       (if strict?
@@ -290,7 +290,7 @@
                         span
                         [update update-file]
                         #:strict [strict? #f]
-                        #:stderr? [stderr? #f])
+                        #:port [port 'stdout])
   (define name
     (if path
         (format "~a:~a" path pos)
@@ -347,10 +347,10 @@
         expected-first:str
         expected-rest:str ...
         (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
-        (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
+        (~optional (~seq #:port st?) #:defaults ([st? #''stdout])))
      #:declare expr (expr/c #'any/c)
      #:declare s? (expr/c #'boolean?)
-     #:declare st? (expr/c #'(or/c boolean? (symbols 'both)))
+     #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both))
      (define expect-list (syntax->list #'(expected-first expected-rest ...)))
      (define first #'expected-first)
      (define last-syn
@@ -369,22 +369,22 @@
                    #,pos
                    #,span
                    #:strict s?
-                   #:stderr? st?)]
+                   #:port st?)]
     [(_ expr
         expected
         (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
-        (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
+        (~optional (~seq #:port st?) #:defaults ([st? #''stdout])))
      #:declare expr (expr/c #'any/c)
      #:declare expected (expr/c #'string?)
      #:declare s? (expr/c #'boolean?)
-     #:declare st? (expr/c #'(or/c boolean? (symbols 'both)))
-     #'(run-expect (lambda () expr) expected #f 0 0 #:strict s? #:stderr? st?)]
+     #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both))
+     #'(run-expect (lambda () expr) expected #f 0 0 #:strict s? #:port st?)]
     [(_ expr
         (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
-        (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
+        (~optional (~seq #:port st?) #:defaults ([st? #''stdout])))
      #:declare expr (expr/c #'any/c)
      #:declare s? (expr/c #'boolean?)
-     #:declare st? (expr/c #'(or/c boolean? (symbols 'both)))
+     #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both))
      (define src (syntax-source stx))
      (define pos (syntax-position stx))
      (define span (syntax-span stx))
@@ -398,18 +398,18 @@
                        #,span
                        update-file-empty
                        #:strict s?
-                       #:stderr? st?)
-         #'(run-expect (lambda () expr) "" #f 0 0 #:strict s? #:stderr? st?))]))
+                       #:port st?)
+         #'(run-expect (lambda () expr) "" #f 0 0 #:strict s? #:port st?))]))
 
 (define-syntax (expect-file stx)
   (syntax-parse stx
     [(_ expr
         path:str
         (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
-        (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
+        (~optional (~seq #:port st?) #:defaults ([st? #''stdout])))
      #:declare expr (expr/c #'any/c)
      #:declare s? (expr/c #'boolean?)
-     #:declare st? (expr/c #'(or/c boolean? (symbols 'both)))
+     #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both))
      #'(let* ([p path]
               [p (if (path? p)
                      p
@@ -421,15 +421,15 @@
                      0
                      update-file-entire
                      #:strict s?
-                     #:stderr? st?))]
+                     #:port st?))]
     [(_ expr
         path-exp
         (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
-        (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
+        (~optional (~seq #:port st?) #:defaults ([st? #''stdout])))
      #:declare expr (expr/c #'any/c)
      #:declare path-exp (expr/c #'path-string?)
      #:declare s? (expr/c #'boolean?)
-     #:declare st? (expr/c #'(or/c boolean? (symbols 'both)))
+     #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both))
      #'(let* ([p path-exp]
               [p (if (path? p)
                      p
@@ -441,7 +441,7 @@
                      0
                      update-file-entire
                      #:strict s?
-                     #:stderr? st?))]))
+                     #:port st?))]))
 
 (define-syntax (expect-exn stx)
   (syntax-parse stx
@@ -449,10 +449,10 @@
         expected-first:str
         expected-rest:str ...
         (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
-        (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
+        (~optional (~seq #:port st?) #:defaults ([st? #''stdout])))
      #:declare expr (expr/c #'any/c)
      #:declare s? (expr/c #'boolean?)
-     #:declare st? (expr/c #'(or/c boolean? (symbols 'both)))
+     #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both))
      (define expect-list (syntax->list #'(expected-first expected-rest ...)))
      (define first #'expected-first)
      (define last-syn
@@ -471,22 +471,22 @@
                        #,pos
                        #,span
                        #:strict s?
-                       #:stderr? st?)]
+                       #:port st?)]
     [(_ expr
         expected
         (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
-        (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
+        (~optional (~seq #:port st?) #:defaults ([st? #''stdout])))
      #:declare expr (expr/c #'any/c)
      #:declare expected (expr/c #'string?)
      #:declare s? (expr/c #'boolean?)
-     #:declare st? (expr/c #'(or/c boolean? (symbols 'both)))
-     #'(run-expect-exn (lambda () expr) expected #f 0 0 #:strict s? #:stderr? st?)]
+     #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both))
+     #'(run-expect-exn (lambda () expr) expected #f 0 0 #:strict s? #:port st?)]
     [(_ expr
         (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
-        (~optional (~seq #:stderr? st?) #:defaults ([st? #'#f])))
+        (~optional (~seq #:port st?) #:defaults ([st? #''stdout])))
      #:declare expr (expr/c #'any/c)
      #:declare s? (expr/c #'boolean?)
-     #:declare st? (expr/c #'(or/c boolean? (symbols 'both)))
+     #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both))
      (define src (syntax-source stx))
      (define pos (syntax-position stx))
      (define span (syntax-span stx))
@@ -500,8 +500,8 @@
                            #,span
                            update-file-empty
                            #:strict s?
-                           #:stderr? st?)
-         #'(run-expect-exn (lambda () expr) "" #f 0 0 #:strict s? #:stderr? st?))]))
+                           #:port st?)
+         #'(run-expect-exn (lambda () expr) "" #f 0 0 #:strict s? #:port st?))]))
 
 (define-syntax (expect-unreachable stx)
   (syntax-parse stx
