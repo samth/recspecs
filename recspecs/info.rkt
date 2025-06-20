@@ -8,4 +8,4 @@
 
 (define build-deps (list "racket-doc" "scribble-doc"))
 
-(define license '(Apache-2.0))
+(define license 'Apache-2.0)

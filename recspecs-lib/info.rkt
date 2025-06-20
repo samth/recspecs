@@ -4,4 +4,4 @@
 
 (define deps (list "rackunit-lib" "base" "at-exp-lib"))
 
-(define license '(Apache-2.0))
+(define license 'Apache-2.0)
