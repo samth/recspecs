@@ -7,15 +7,20 @@
          racket/vector
          racket/match
          racket/path
+         racket/pretty
          rackunit
          racket/contract
+         syntax/parse/define
          (for-syntax racket/base
                      syntax/parse
+                     syntax/parse/define
                      syntax/parse/experimental/contract
                      racket/list
                      racket/file))
 
 (provide expect
+         expect/print
+         expect/pretty
          expect-file
          expect-exn
          expect-unreachable
@@ -512,3 +517,9 @@
      (define span (syntax-span stx))
      (define expr-str (format "~s" (syntax->datum #'expr)))
      #`(run-expect-unreachable #,expr-str #,(and src (path->string src)) #,pos #,span)]))
+
+(define-syntax-parse-rule (expect/print expr arg ...)
+  (expect (print expr) arg ...))
+
+(define-syntax-parse-rule (expect/pretty expr arg ...)
+  (expect (pretty-print expr) arg ...))

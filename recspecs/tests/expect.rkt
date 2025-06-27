@@ -18,6 +18,10 @@
     (expect (display "hello") "  hello  \n")
     ;; Strict matching
     (expect (display "strict") "strict" #:strict? #t)
+    (expect/print (+ 1 1) "2")
+    (expect/pretty (list 1 2) "'(1 2)\n")
+    (parameterize ([pretty-print-columns 3])
+      (expect/pretty (list 1 2 3 4) "'(1\n  2\n  3\n  4)\n"))
     (expect-exn (raise (exn:fail "oops" (current-continuation-marks))) "oops")))
 
 ;; Macro expansion with no expectation should not error
