@@ -88,6 +88,18 @@ expectations:
   hello
   3}]
 
+@defform[(expect/print expr expected-str ...)]{
+Like @racket[expect], but the result of @racket[expr] is printed with
+@racket[print] before comparison.  This is shorthand for
+@racket[(expect (print expr) expected-str ...)].
+}
+
+@defform[(expect/pretty expr expected-str ...)]{
+Like @racket[expect/print], but uses @racket[pretty-print] to output the
+result.  The newline produced by @racket[pretty-print] is included in the
+expectation.
+}
+
 @defform[(expect-file expr path-str)]{
 Reads the expectation from @racket[path-str] instead of embedding it in the
 source. The file is replaced with new output when @tt{RECSPECS_UPDATE} is set.

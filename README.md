@@ -17,6 +17,10 @@ Additional forms mirror features from the OCaml and Rust libraries:
 * `expect-exn` checks that an expression raises an exception with a given
   message.
 * `expect-unreachable` fails if the wrapped expression is evaluated.
+* `expect/print` runs `expr`, prints the result with `print`, and compares
+  the printed output.
+* `expect/pretty` is like `expect/print` but uses `pretty-print`, so the
+  expectation includes a trailing newline.
 * All expectation forms accept multiple string arguments which are
   concatenated together. This is handy when using
   `#lang at-exp` for multi-line expectations.
@@ -99,6 +103,13 @@ Check exception messages using `expect-exn`:
 
 ```racket
 (expect-exn (raise-user-error "bad") "bad")
+```
+
+Automatically print a value before comparing:
+
+```racket
+(expect/print (+ 1 2) "3")
+(expect/pretty '(1 2 3) "(1 2 3)\n")
 ```
 
 Transform output before comparison with `recspecs-output-filter`:
