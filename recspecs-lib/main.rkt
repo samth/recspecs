@@ -348,14 +348,17 @@
 
 (define-syntax (expect stx)
   (syntax-parse stx
+    ;; Pattern with expectation strings
     [(_ expr
         expected-first:str
         expected-rest:str ...
-        (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
-        (~optional (~seq #:port st?) #:defaults ([st? #''stdout])))
-     #:declare expr (expr/c #'any/c)
-     #:declare s? (expr/c #'boolean?)
-     #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both))
+        (~optional (~seq #:strict? s?) 
+                   #:defaults ([s? #'#f]))
+        (~optional (~seq #:port st?) 
+                   #:defaults ([st? #''stdout])))
+     #:declare expr (expr/c #'any/c #:name "expression")
+     #:declare s? (expr/c #'boolean? #:name "boolean value")
+     #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both) #:name "port symbol ('stdout, 'stderr, or 'both)")
      (define expect-list (syntax->list #'(expected-first expected-rest ...)))
      (define first #'expected-first)
      (define last-syn
@@ -375,21 +378,23 @@
                    #,span
                    #:strict s?
                    #:port st?)]
+    ;; Pattern with single expectation string
     [(_ expr
         expected
         (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
         (~optional (~seq #:port st?) #:defaults ([st? #''stdout])))
-     #:declare expr (expr/c #'any/c)
-     #:declare expected (expr/c #'string?)
-     #:declare s? (expr/c #'boolean?)
-     #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both))
+     #:declare expr (expr/c #'any/c #:name "expression")
+     #:declare expected (expr/c #'string? #:name "expectation string")
+     #:declare s? (expr/c #'boolean? #:name "boolean value")
+     #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both) #:name "port symbol ('stdout, 'stderr, or 'both)")
      #'(run-expect (lambda () expr) expected #f 0 0 #:strict s? #:port st?)]
+    ;; Pattern with no expectation string
     [(_ expr
         (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
         (~optional (~seq #:port st?) #:defaults ([st? #''stdout])))
-     #:declare expr (expr/c #'any/c)
-     #:declare s? (expr/c #'boolean?)
-     #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both))
+     #:declare expr (expr/c #'any/c #:name "expression")
+     #:declare s? (expr/c #'boolean? #:name "boolean value")
+     #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both) #:name "port symbol ('stdout, 'stderr, or 'both)")
      (define src (syntax-source stx))
      (define pos (syntax-position stx))
      (define span (syntax-span stx))
@@ -404,7 +409,15 @@
                        update-file-empty
                        #:strict s?
                        #:port st?)
-         #'(run-expect (lambda () expr) "" #f 0 0 #:strict s? #:port st?))]))
+         #'(run-expect (lambda () expr) "" #f 0 0 #:strict s? #:port st?))]
+    ;; Error case for missing expression
+    [()
+     (raise-syntax-error 'expect "missing expression argument" stx)]
+    ;; Generic error case
+    [_
+     (raise-syntax-error 'expect 
+                         "bad syntax\n  expected: (expect expr [expected-string ...] [#:strict? boolean] [#:port port-symbol])" 
+                         stx)]))
 
 (define-syntax (expect-file stx)
   (syntax-parse stx

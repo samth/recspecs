@@ -33,6 +33,47 @@
                          (namespace-require 'recspecs)
                          (expand #'(expect (display 5)))))))))
 
+;; Test improved syntax error messages
+(define syntax-error-tests
+  (test-suite "syntax-error-tests"
+    (test-case "expect with no arguments"
+      (check-exn #rx"expect: missing expression argument"
+                 (lambda ()
+                   (parameterize ([current-namespace (make-base-namespace)])
+                     (namespace-require 'recspecs)
+                     (expand #'(expect))))))
+    (test-case "expect with non-string expectation"
+      (check-exn #rx"expected expectation string"
+                 (lambda ()
+                   (parameterize ([current-namespace (make-base-namespace)])
+                     (namespace-require 'recspecs)
+                     (expand #'(expect (display "hi") 123))))))
+    (test-case "expect with non-boolean #:strict?"
+      (check-exn #rx"expected boolean value"
+                 (lambda ()
+                   (parameterize ([current-namespace (make-base-namespace)])
+                     (namespace-require 'recspecs)
+                     (expand #'(expect (display "hi") "hi" #:strict? "yes"))))))
+    (test-case "expect with invalid #:port"
+      (check-exn #rx"expected port symbol"
+                 (lambda ()
+                   (parameterize ([current-namespace (make-base-namespace)])
+                     (namespace-require 'recspecs)
+                     (expand #'(expect (display "hi") "hi" #:port invalid))))))
+    (test-case "expect with valid #:port symbols"
+      (check-not-exn (lambda ()
+                       (parameterize ([current-namespace (make-base-namespace)])
+                         (namespace-require 'recspecs)
+                         (expand #'(expect (display "hi") "hi" #:port 'stdout)))))
+      (check-not-exn (lambda ()
+                       (parameterize ([current-namespace (make-base-namespace)])
+                         (namespace-require 'recspecs)
+                         (expand #'(expect (display "hi") "hi" #:port 'stderr)))))
+      (check-not-exn (lambda ()
+                       (parameterize ([current-namespace (make-base-namespace)])
+                         (namespace-require 'recspecs)
+                         (expand #'(expect (display "hi") "hi" #:port 'both))))))))
+
 ;; Ensure that @expect with empty braces is updated
 (define at-exp-empty-tests
   (test-suite "at-exp-empty-tests"
@@ -110,6 +151,7 @@
   (run-tests (test-suite "all"
                expect-tests
                expansion-tests
+               syntax-error-tests
                at-exp-empty-tests
                at-exp-base-tests
                at-exp-newline-tests)))
