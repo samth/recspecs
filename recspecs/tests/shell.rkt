@@ -14,7 +14,7 @@
     (test-case "bc calculator with division"
       (expect/shell "bc" "> 15/3\n5\n> 22/7\n3\n> quit\n"))
     (test-case "bc calculator complex session"
-      (expect/shell "bc" @~a{> 2^8
+      @expect/shell["bc" @~a{> 2^8
 256
 > (5+3)*2
 16
@@ -22,7 +22,7 @@
 > 22/7
 3.14
 > quit
-}))))
+}])))
 
 (module+ test
   (run-tests shell-tests))
