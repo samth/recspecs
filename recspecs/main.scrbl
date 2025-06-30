@@ -211,3 +211,22 @@ exception whose message matches @racket[expected].
 Replace the entire file at @racket[path] with @racket[new-str].
 }
 
+@section{Shell Commands}
+@defmodule[recspecs/shell]
+
+@defform[(expect/shell cmd-expr expected-str ...)]{
+Run @racket[cmd-expr] as a subprocess and compare the interaction
+against @racket[expected-str ...].  Lines in the expectation that begin
+with @litchar{>} are sent to the process as input (without the prompt).
+The command's responses are captured and the full transcript is checked
+against the expectation.
+}
+@racketblock[
+  (require recspecs/shell)
+  @expect/shell["cat"]{
+  > hi
+  hi
+  > there
+  there
+  }
+]

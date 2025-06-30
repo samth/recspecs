@@ -21,6 +21,9 @@ Additional forms mirror features from the OCaml and Rust libraries:
   the printed output.
 * `expect/pretty` is like `expect/print` but uses `pretty-print`, so the
   expectation includes a trailing newline.
+* `expect/shell` from `recspecs/shell` runs an external command and compares
+  the session against a transcript. Lines beginning with `>` are sent to the
+  command's input.
 * All expectation forms accept multiple string arguments which are
   concatenated together. This is handy when using
   `#lang at-exp` for multi-line expectations.
@@ -110,6 +113,12 @@ Automatically print a value before comparing:
 ```racket
 (expect/print (+ 1 2) "3")
 (expect/pretty '(1 2 3) "(1 2 3)\n")
+@expect/shell["cat"]{
+> hi
+hi
+> there
+there
+}
 ```
 
 Transform output before comparison with `recspecs-output-filter`:
