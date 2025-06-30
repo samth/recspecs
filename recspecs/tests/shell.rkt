@@ -6,13 +6,29 @@
 (define shell-tests
   (test-suite "shell-tests"
     (test-case "cat session"
-      (expect/shell "cat" "> hi\nhi\n> there\nthere\n"))
+      @expect/shell["cat"]{> hi
+hi
+> there
+there
+})
     (test-case "strict output"
-      (expect/shell "cat" "> ok\nok\n" #:strict? #t))
+      @expect/shell["cat" #:strict? #t]{> ok
+ok
+})
     (test-case "bc calculator basic"
-      (expect/shell "bc" "> 2+3\n5\n> 10*4\n40\n> quit\n"))
+      @expect/shell["bc"]{> 2+3
+5
+> 10*4
+40
+> quit
+})
     (test-case "bc calculator with division"
-      (expect/shell "bc" "> 15/3\n5\n> 22/7\n3\n> quit\n"))
+      @expect/shell["bc"]{> 15/3
+5
+> 22/7
+3
+> quit
+})
     (test-case "bc calculator complex session"
       @expect/shell["bc"]{> 2^8
 256
