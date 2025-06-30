@@ -214,6 +214,12 @@ Replace the entire file at @racket[path] with @racket[new-str].
 @section{Shell Commands}
 @defmodule[recspecs/shell]
 
+The @racket[recspecs/shell] module provides tools for testing interactive shell 
+commands, inspired by the Unix @exec{expect} tool. It supports both simple transcript-based 
+testing and advanced pattern-based automation.
+
+@subsection{Basic Shell Testing}
+
 @defform[(expect/shell cmd-expr expected-str ...)]{
 Run @racket[cmd-expr] as a subprocess and compare the interaction
 against @racket[expected-str ...].  Lines in the expectation that begin
@@ -229,4 +235,274 @@ against the expectation.
   > there
   there
   }
+]
+
+@subsection{Pattern-Based Shell Automation}
+
+For complex interactive scenarios, @racket[expect/shell/patterns] provides a 
+declarative pattern-matching approach similar to the Unix @exec{expect} tool.
+
+@defform[(expect/shell/patterns cmd-expr option ... [pattern action] ...)
+         #:grammar
+         ([option (code:line #:timeout timeout-expr)
+                  (code:line #:strict? strict?-expr)]
+          [pattern string-expr
+                   (code:line (exact string-expr))
+                   (code:line (regex regex-expr))
+                   (code:line (glob glob-string-expr))
+                   (code:line (timeout seconds-expr))
+                   (code:line eof)]
+          [action (code:line (send-input text-expr))
+                  (code:line continue)
+                  (code:line retry)
+                  (code:line (error message-expr))
+                  procedure-expr])]{
+
+Runs @racket[cmd-expr] as an interactive subprocess and processes output using 
+pattern/action pairs. Each pattern is matched against the accumulated output, and 
+when matched, the corresponding action is executed.
+
+@bold{Options:}
+@itemlist[
+@item{@racket[#:timeout] — Sets the default timeout in seconds for the entire session (default: 30)}
+@item{@racket[#:strict?] — Controls whether whitespace normalization is applied (default: @racket[#f])}
+]
+
+@bold{Patterns:}
+@itemlist[
+@item{@racket[string-expr] or @racket[(exact string-expr)] — Exact string matching}
+@item{@racket[(regex regex-expr)] — Regular expression matching with capture group support}
+@item{@racket[(glob glob-string-expr)] — Glob pattern matching with @litchar{*} and @litchar{?} wildcards}
+@item{@racket[(timeout seconds-expr)] — Matches when the specified timeout is reached}
+@item{@racket[eof] — Matches when the process terminates}
+]
+
+@bold{Actions:}
+@itemlist[
+@item{@racket[(send-input text-expr)] — Send text as input to the process}
+@item{@racket[continue] — Proceed to the next pattern}
+@item{@racket[retry] — Retry the current pattern}
+@item{@racket[(error message-expr)] — Raise an error with the given message}
+@item{@racket[procedure-expr] — Call a custom procedure with session and variables}
+]
+}
+
+@bold{Examples:}
+
+Simple command interaction:
+@racketblock[
+  (expect/shell/patterns "bash"
+    ["$" (send-input "echo hello")]
+    ["hello" (send-input "exit")])]
+
+Using regex patterns with timeout:
+@racketblock[
+  (expect/shell/patterns "slow-server" #:timeout 60
+    [(regex #rx"Server started on port ([0-9]+)") 
+     (send-input "connect")]
+    [(timeout 30) (error "Server startup timeout")]
+    ["Connected" continue])]
+
+Glob patterns and error handling:
+@racketblock[
+  (expect/shell/patterns "deployment-script"
+    [(glob "*$ ") (send-input "deploy app")]
+    [(glob "*Success*") continue]
+    [(glob "*Error*") (error "Deployment failed")]
+    [(glob "*Warning*") continue])]
+
+Variable capture and substitution:
+@racketblock[
+  (expect/shell/patterns "bash"
+    ["$" (send-input "echo 'port: 8080'")]
+    [(regex #rx"port: ([0-9]+)") (send-input "connect $0")]
+    ["connected" (send-input "exit")])]
+
+@subsection{Advanced Pattern Features}
+
+@subsubsection{Variable Capture}
+
+When using @racket[(regex regex-expr)] patterns, capture groups are automatically 
+extracted and made available for variable substitution in subsequent actions. 
+Variables are referenced as @racket[$0], @racket[$1], @racket[$2], etc., where 
+@racket[$0] is the first capture group.
+
+@racketblock[
+  (expect/shell/patterns "date"
+    [(regex #rx"([A-Z][a-z]+) ([0-9]+)") 
+     (send-input "echo Month: $0, Day: $1")])]
+
+@subsubsection{Flow Control}
+
+@itemlist[
+@item{@racket[continue] — Advances to the next pattern in the sequence}
+@item{@racket[retry] — Repeats the current pattern (useful for polling)}
+@item{@racket[(error msg)] — Terminates with a controlled error}
+]
+
+@racketblock[
+  (expect/shell/patterns "build-system"
+    ["Building..." continue]
+    [(regex #rx"Progress: ([0-9]+)%") retry]  ; Keep polling
+    ["Build complete" continue]
+    [(glob "*failed*") (error "Build failed")])]
+
+@subsubsection{Timeout Handling}
+
+Individual patterns can specify timeouts, and a global session timeout can be set:
+
+@racketblock[
+  (expect/shell/patterns "long-running-process" #:timeout 300
+    ["Starting..." continue]
+    [(timeout 60) (send-input "status")]  ; Check status after 1 minute
+    ["Progress: 100%" continue]
+    [(timeout 300) (error "Process timeout")])]
+
+@subsubsection{Custom Actions}
+
+For complex logic, actions can be procedures that receive the session state and captured variables:
+
+@racketblock[
+  (define (analyze-output session vars)
+    (if (> (length vars) 0)
+        (printf "Captured: ~a~n" (car vars))
+        (printf "No captures~n"))
+    'continue)
+
+  (expect/shell/patterns "analyzer"
+    [(regex #rx"Result: (.+)") analyze-output])]
+
+@subsection{Pattern Matching Reference}
+
+@defproc[(match-pattern [pattern pattern?] [text string?] [vars list?]) 
+         (values boolean? list? string?)]{
+Tests whether @racket[pattern] matches @racket[text]. Returns three values:
+whether the pattern matched, updated variable list with any captures, and the text.
+
+This function underlies the pattern matching in @racket[expect/shell/patterns] and 
+can be used directly for testing pattern logic.
+}
+
+@racketblock[
+  (define-values (matched? vars text)
+    (match-pattern (pattern-regex #rx"port: ([0-9]+)") "port: 8080" '()))
+  ; matched? => #t
+  ; vars => '("8080")
+]
+
+@subsection{Error Handling and Debugging}
+
+When patterns fail to match or timeouts occur, @racket[expect/shell/patterns] provides 
+detailed error messages including:
+
+@itemlist[
+@item{The accumulated output at the time of failure}
+@item{The pattern that was being matched}
+@item{Suggestions for common issues}
+]
+
+For debugging complex interactions, enable verbose mode with @racket[recspecs-verbose?] 
+or the @tt{RECSPECS_VERBOSE} environment variable to see real-time output.
+
+@subsection{Migration from Basic Shell Testing}
+
+Existing @racket[expect/shell] tests can be gradually migrated to the pattern-based 
+approach for enhanced functionality:
+
+@racketblock[
+  ; Before: transcript-based
+  @expect/shell["interactive-app"]{
+  > start
+  Ready
+  > process data.txt
+  Processing...
+  Done
+  > quit
+  }
+
+  ; After: pattern-based
+  (expect/shell/patterns "interactive-app"
+    ["$" (send-input "start")]
+    ["Ready" (send-input "process data.txt")]
+    [(glob "*Processing*") continue]
+    ["Done" (send-input "quit")])]
+
+@subsection{Pattern and Action Structures}
+
+The pattern-based shell automation is built on the following structures, which can be 
+used directly for advanced scenarios:
+
+@defstruct[pattern-action ([pattern pattern?] [action action?] [vars list?])]{
+Combines a pattern with its corresponding action. The @racket[vars] field stores 
+captured variables from previous pattern matches.
+}
+
+@defstruct[pattern-exact ([text string?])]{
+Matches exact string content within the output.
+}
+
+@defstruct[pattern-regex ([regex regexp?])]{
+Matches using regular expressions and captures groups for variable substitution.
+}
+
+@defstruct[pattern-glob ([pattern string?])]{
+Matches using glob patterns with @litchar{*} and @litchar{?} wildcards.
+}
+
+@defstruct[pattern-timeout ([seconds number?])]{
+Triggers when the specified number of seconds have elapsed.
+}
+
+@defstruct[pattern-eof ()]{
+Triggers when the subprocess terminates or reaches end-of-file.
+}
+
+@defstruct[action-send-text ([text string?])]{
+Sends the specified text to the subprocess as input.
+}
+
+@defstruct[action-continue ()]{
+Proceeds to the next pattern in the sequence.
+}
+
+@defstruct[action-retry ()]{
+Retries the current pattern without advancing.
+}
+
+@defstruct[action-error ([message string?])]{
+Raises an error with the specified message.
+}
+
+@defstruct[action-proc ([proc procedure?])]{
+Executes a custom procedure with signature @racket[(-> shell-session? list? symbol?)].
+}
+
+@defproc[(shell-run-patterns [cmd (or/c string? (listof string?))] 
+                             [patterns (listof pattern-action?)] 
+                             [#:timeout timeout number? 30]) 
+         void?]{
+Low-level function that runs the pattern-based shell interaction. This function 
+underlies @racket[expect/shell/patterns] and can be used for programmatic control.
+}
+
+@racketblock[
+  (shell-run-patterns "bash"
+    (list (pattern-action (pattern-exact "$") 
+                         (action-send-text "echo test") 
+                         '())
+          (pattern-action (pattern-exact "test")
+                         (action-send-text "exit")
+                         '())))]
+
+@subsection{Best Practices}
+
+@itemlist[
+@item{Use specific patterns to avoid false matches: prefer @racket[(exact "$ ")] over @racket["$"]}
+@item{Include timeout patterns for long-running operations}
+@item{Use @racket[continue] judiciously to handle intermediate output}
+@item{Capture important values with regex patterns for reuse}
+@item{Test pattern logic in isolation using @racket[match-pattern]}
+@item{Enable verbose mode during development for better visibility}
+@item{Consider the order of patterns carefully: more specific patterns should come before general ones}
+@item{Use @racket[eof] patterns to handle unexpected process termination gracefully}
 ]
