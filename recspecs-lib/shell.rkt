@@ -65,9 +65,9 @@
 (define-syntax (expect/shell stx)
   (syntax-parse stx
     [(_ cmd
+	(~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
         expected-first:str
-        expected-rest:str ...
-        (~optional (~seq #:strict? s?) #:defaults ([s? #'#f])))
+        expected-rest:str ...)
      #:declare cmd (expr/c #'any/c)
      #:declare s? (expr/c #'boolean?)
      (define expect-list (syntax->list #'(expected-first expected-rest ...)))

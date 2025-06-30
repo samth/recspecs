@@ -14,6 +14,7 @@ there
     (test-case "strict output"
       @expect/shell["cat" #:strict? #t]{> ok
 ok
+
 })
     (test-case "bc calculator basic"
       @expect/shell["bc"]{> 2+3
