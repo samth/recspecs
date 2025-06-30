@@ -410,10 +410,7 @@
                        #:strict s?
                        #:port st?)
          #'(run-expect (lambda () expr) "" #f 0 0 #:strict s? #:port st?))]
-    ;; Error case for missing expression
-    [()
-     (raise-syntax-error 'expect "missing expression argument" stx)]
-    ;; Generic error case
+    ;; Generic error case (includes empty form)
     [_
      (raise-syntax-error 'expect 
                          "bad syntax\n  expected: (expect expr [expected-string ...] [#:strict? boolean] [#:port port-symbol])" 

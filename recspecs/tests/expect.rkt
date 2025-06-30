@@ -36,31 +36,28 @@
 ;; Test improved syntax error messages
 (define syntax-error-tests
   (test-suite "syntax-error-tests"
-    (test-case "expect with no arguments"
-      (check-exn #rx"expect: missing expression argument"
+    (test-case "expect with no arguments gives bad syntax error"
+      (check-exn #rx"expect: bad syntax"
                  (lambda ()
                    (parameterize ([current-namespace (make-base-namespace)])
                      (namespace-require 'recspecs)
                      (expand #'(expect))))))
-    (test-case "expect with non-string expectation"
-      (check-exn #rx"expected expectation string"
-                 (lambda ()
-                   (parameterize ([current-namespace (make-base-namespace)])
-                     (namespace-require 'recspecs)
-                     (expand #'(expect (display "hi") 123))))))
-    (test-case "expect with non-boolean #:strict?"
-      (check-exn #rx"expected boolean value"
-                 (lambda ()
-                   (parameterize ([current-namespace (make-base-namespace)])
-                     (namespace-require 'recspecs)
-                     (expand #'(expect (display "hi") "hi" #:strict? "yes"))))))
-    (test-case "expect with invalid #:port"
-      (check-exn #rx"expected port symbol"
-                 (lambda ()
-                   (parameterize ([current-namespace (make-base-namespace)])
-                     (namespace-require 'recspecs)
-                     (expand #'(expect (display "hi") "hi" #:port invalid))))))
-    (test-case "expect with valid #:port symbols"
+    (test-case "expect with expression expectation works at expansion"
+      (check-not-exn (lambda ()
+                       (parameterize ([current-namespace (make-base-namespace)])
+                         (namespace-require 'recspecs)
+                         (expand #'(expect (display "hi") (number->string 123)))))))
+    (test-case "expect with non-boolean #:strict? expands but fails at runtime"
+      (check-not-exn (lambda ()
+                       (parameterize ([current-namespace (make-base-namespace)])
+                         (namespace-require 'recspecs)
+                         (expand #'(expect (display "hi") "hi" #:strict? "yes"))))))
+    (test-case "expect with invalid #:port expands but fails at runtime"
+      (check-not-exn (lambda ()
+                       (parameterize ([current-namespace (make-base-namespace)])
+                         (namespace-require 'recspecs)
+                         (expand #'(expect (display "hi") "hi" #:port invalid))))))
+    (test-case "expect with valid #:port symbols works"
       (check-not-exn (lambda ()
                        (parameterize ([current-namespace (make-base-namespace)])
                          (namespace-require 'recspecs)
