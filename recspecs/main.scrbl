@@ -152,7 +152,6 @@ Represents recorded output that can be committed or skipped. The
 structure is mutable so repeated @racket[with-expectation] blocks can
 append to @racket[out].}
 
-@defproc[(make-expectation) expectation?]{Create a fresh expectation.}
 
 @defproc[(commit-expectation! [e expectation?]) void?]{Mark @racket[e] as committed.}
 
