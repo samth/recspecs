@@ -216,7 +216,7 @@ Replace the entire file at @racket[path] with @racket[new-str].
 The @racket[recspecs/shell] module provides tools for testing interactive shell 
 commands, inspired by the Unix @exec{expect} tool. It supports both simple transcript-based 
 testing and advanced pattern-based automation.
-
+Lines beginning with @litchar{>} in a transcript are sent to the subprocess while the remaining text is compared against its output. Pattern mode adds exact and regular expression matching, glob wildcards, per-pattern timeouts, and user-defined actions.
 @subsection{Basic Shell Testing}
 
 @defform[(expect/shell cmd-expr expected-str ...)]{
