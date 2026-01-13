@@ -29,6 +29,7 @@
          run-expect-unreachable
          update-file-entire
          with-expectation
+         flush-pending-updates!
          (contract-out (struct expectation ([out string?] [committed? boolean?] [skip? boolean?]))
                        [make-expectation (-> expectation?)]
                        [commit-expectation! (-> expectation? void?)]
@@ -137,6 +138,45 @@
          (if filter
              (and name (string-contains? name filter))
              #t))))
+
+;; ----------------------------------------------------------------------
+;; Offset tracking for file updates
+;;
+;; When multiple @expect forms in the same file need updating, earlier updates
+;; change the file size, making later positions stale. We track cumulative
+;; offsets per file so positions can be adjusted correctly.
+;;
+;; This approach updates immediately (no batching needed) which avoids
+;; module instance sharing issues with dynamic-require.
+
+;; Hash from file path to cumulative byte offset (how much file has grown/shrunk)
+(define file-offsets (make-hash))
+
+;; Apply an update with offset adjustment
+(define (apply-update-with-offset path pos span new-str update-fn)
+  (define offset (hash-ref file-offsets path 0))
+  (define adjusted-pos (+ pos offset))
+  ;; Measure actual file size before update
+  (define size-before (file-size path))
+  ;; Update the file at the adjusted position
+  (update-fn path adjusted-pos span new-str)
+  ;; Measure actual file size after update to get true size change
+  ;; This is more robust than calculating from span/new-str because different
+  ;; update functions replace different amounts of content (e.g., update-file-empty
+  ;; only replaces {} not the entire span)
+  (define size-after (file-size path))
+  (define size-change (- size-after size-before))
+  ;; Track the cumulative offset for future updates in this file
+  (hash-set! file-offsets path (+ offset size-change)))
+
+;; Helper to get UTF-8 byte length of a string
+(define (string-utf-8-length s)
+  (bytes-length (string->bytes/utf-8 s)))
+
+;; Flush is now a no-op since updates are applied immediately,
+;; but we keep it for API compatibility and to reset offsets
+(define (flush-pending-updates!)
+  (hash-clear! file-offsets))
 
 (define (update-file path pos span new-str)
   ;; Replace the expectation string located at [pos, pos+span) in the file
@@ -275,7 +315,7 @@
     (define equal? (comparator expected actual))
     (cond
       [(and path (update-mode? name) (not equal?))
-       (update path pos span actual)
+       (apply-update-with-offset path pos span actual update)
        (commit-expectation! e)
        (printf "Updated expectation in ~a\n" path)]
       [equal?
@@ -315,7 +355,7 @@
     (define equal? (comparator expected actual))
     (cond
       [(and path (update-mode? name) (not equal?))
-       (update path pos span actual)
+       (apply-update-with-offset path pos span actual update)
        (commit-expectation! e)
        (printf "Updated expectation in ~a\n" path)]
       [equal?
@@ -339,7 +379,7 @@
     (define e (make-expectation))
     (cond
       [(and path (update-mode? name))
-       (update-file-rewrite path pos span expr-str)
+       (apply-update-with-offset path pos span expr-str update-file-rewrite)
        (commit-expectation! e)
        (printf "Updated expectation in ~a\n" path)]
       [else
