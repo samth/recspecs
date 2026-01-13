@@ -76,22 +76,18 @@
   (test-suite "at-exp-empty-tests"
     (test-case "updates empty at-exp braces"
       (define tmp (make-temporary-file "tmp~a.rkt"))
-      (define main-path (build-path (current-directory) ".." ".." "recspecs-lib" "main.rkt"))
       (call-with-output-file
        tmp
        #:exists 'truncate/replace
        (lambda (out)
-         (fprintf out
-                  "#lang at-exp racket\n(require (file \"~a\"))\n@expect[(displayln \"foo\")]{}\n"
-                  (path->string main-path))))
+         (display "#lang at-exp racket\n(require recspecs)\n@expect[(displayln \"foo\")]{}\n" out)))
       (putenv "RECSPECS_UPDATE" "1")
       (dynamic-require tmp #f)
+      (flush-pending-updates!)
       (putenv "RECSPECS_UPDATE" "")
       (define expected
         (string-append "#lang at-exp racket\n"
-                       "(require (file \""
-                       (path->string main-path)
-                       "\"))\n"
+                       "(require recspecs)\n"
                        "@expect[(displayln \"foo\")]{"
                        "foo\n"
                        "}\n"))
@@ -113,6 +109,7 @@
       (putenv "RECSPECS_UPDATE" "1")
       (putenv "RECSPECS_UPDATE_TEST" tmp-str)
       (dynamic-require tmp #f)
+      (flush-pending-updates!)
       (putenv "RECSPECS_UPDATE" "")
       (putenv "RECSPECS_UPDATE_TEST" "")
       (define expected
@@ -136,12 +133,156 @@
       (putenv "RECSPECS_UPDATE" "1")
       (putenv "RECSPECS_UPDATE_TEST" tmp-str)
       (dynamic-require tmp #f)
+      (flush-pending-updates!)
       (putenv "RECSPECS_UPDATE" "")
       (putenv "RECSPECS_UPDATE_TEST" "")
       (define expected
         (string-append "#lang at-exp racket/base\n"
                        "(require recspecs)\n\n"
                        "@expect[(print 400)]{\n 400\n}\n"))
+      (check-equal? (file->string tmp) expected))))
+
+;; Regression test for issue #57: File corruption when RECSPECS_UPDATE=1
+;; updates multiple @expect forms in the same file. Previously, byte positions
+;; would become stale after the first update, causing subsequent updates to
+;; corrupt the file. The fix tracks cumulative offsets per file.
+(define multi-update-tests
+  (test-suite "multi-update-tests"
+    (test-case "updates multiple expect forms without corruption"
+      (define tmp (make-temporary-file "multi~a.rkt"))
+      (call-with-output-file tmp
+                             #:exists 'truncate/replace
+                             (lambda (out)
+                               (display "#lang at-exp racket/base\n" out)
+                               (display "(require recspecs)\n\n" out)
+                               ;; Three @expect forms that all need updating
+                               (display "@expect[(displayln \"first\")]{}\n" out)
+                               (display "@expect[(displayln \"second\")]{}\n" out)
+                               (display "@expect[(displayln \"third\")]{}\n" out)))
+      (define tmp-str (path->string tmp))
+      (putenv "RECSPECS_UPDATE" "1")
+      (putenv "RECSPECS_UPDATE_TEST" tmp-str)
+      (dynamic-require tmp #f)
+      (flush-pending-updates!)
+      (putenv "RECSPECS_UPDATE" "")
+      (putenv "RECSPECS_UPDATE_TEST" "")
+      (define expected
+        (string-append "#lang at-exp racket/base\n"
+                       "(require recspecs)\n\n"
+                       "@expect[(displayln \"first\")]{first\n}\n"
+                       "@expect[(displayln \"second\")]{second\n}\n"
+                       "@expect[(displayln \"third\")]{third\n}\n"))
+      (check-equal? (file->string tmp) expected))
+
+    ;; Test with varying output sizes to stress offset tracking
+    (test-case "handles varying output sizes correctly"
+      (define tmp (make-temporary-file "vary~a.rkt"))
+      (call-with-output-file tmp
+                             #:exists 'truncate/replace
+                             (lambda (out)
+                               (display "#lang at-exp racket/base\n" out)
+                               (display "(require recspecs)\n\n" out)
+                               ;; Short, very long, then short output
+                               (display "@expect[(display \"a\")]{}\n" out)
+                               (display "@expect[(display (make-string 100 #\\x))]{}\n" out)
+                               (display "@expect[(display \"b\")]{}\n" out)))
+      (define tmp-str (path->string tmp))
+      (putenv "RECSPECS_UPDATE" "1")
+      (putenv "RECSPECS_UPDATE_TEST" tmp-str)
+      (dynamic-require tmp #f)
+      (flush-pending-updates!)
+      (putenv "RECSPECS_UPDATE" "")
+      (putenv "RECSPECS_UPDATE_TEST" "")
+      (define expected
+        (string-append "#lang at-exp racket/base\n"
+                       "(require recspecs)\n\n"
+                       "@expect[(display \"a\")]{a}\n"
+                       "@expect[(display (make-string 100 #\\x))]{" (make-string 100 #\x) "}\n"
+                       "@expect[(display \"b\")]{b}\n"))
+      (check-equal? (file->string tmp) expected))
+
+    ;; Note: Unicode content with multi-byte characters has known issues
+    ;; with at-exp syntax position tracking. This test verifies ASCII-only
+    ;; multi-update works. Unicode support may need separate investigation.
+
+    ;; Test with many @expect forms to stress test offset accumulation
+    (test-case "handles many expect forms"
+      (define tmp (make-temporary-file "many~a.rkt"))
+      (call-with-output-file tmp
+                             #:exists 'truncate/replace
+                             (lambda (out)
+                               (display "#lang at-exp racket/base\n" out)
+                               (display "(require recspecs)\n\n" out)
+                               ;; 10 @expect forms
+                               (for ([i (in-range 10)])
+                                 (fprintf out "@expect[(display ~a)]{}\n" i))))
+      (define tmp-str (path->string tmp))
+      (putenv "RECSPECS_UPDATE" "1")
+      (putenv "RECSPECS_UPDATE_TEST" tmp-str)
+      (dynamic-require tmp #f)
+      (flush-pending-updates!)
+      (putenv "RECSPECS_UPDATE" "")
+      (putenv "RECSPECS_UPDATE_TEST" "")
+      (define expected
+        (string-append "#lang at-exp racket/base\n"
+                       "(require recspecs)\n\n"
+                       (apply string-append
+                              (for/list ([i (in-range 10)])
+                                (format "@expect[(display ~a)]{~a}\n" i i)))))
+      (check-equal? (file->string tmp) expected))
+
+    ;; Test updating stale expectations (non-empty braces)
+    (test-case "updates stale expectations correctly"
+      (define tmp (make-temporary-file "stale~a.rkt"))
+      (call-with-output-file tmp
+                             #:exists 'truncate/replace
+                             (lambda (out)
+                               (display "#lang at-exp racket/base\n" out)
+                               (display "(require recspecs)\n\n" out)
+                               ;; Expectations with wrong/outdated content
+                               (display "@expect[(display \"new1\")]{old1}\n" out)
+                               (display "@expect[(display \"new2\")]{old2}\n" out)
+                               (display "@expect[(display \"new3\")]{old3}\n" out)))
+      (define tmp-str (path->string tmp))
+      (putenv "RECSPECS_UPDATE" "1")
+      (putenv "RECSPECS_UPDATE_TEST" tmp-str)
+      (dynamic-require tmp #f)
+      (flush-pending-updates!)
+      (putenv "RECSPECS_UPDATE" "")
+      (putenv "RECSPECS_UPDATE_TEST" "")
+      (define expected
+        (string-append "#lang at-exp racket/base\n"
+                       "(require recspecs)\n\n"
+                       "@expect[(display \"new1\")]{new1}\n"
+                       "@expect[(display \"new2\")]{new2}\n"
+                       "@expect[(display \"new3\")]{new3}\n"))
+      (check-equal? (file->string tmp) expected))
+
+    ;; Test with quoted string syntax (regular racket, not at-exp)
+    (test-case "updates quoted string expectations correctly"
+      (define tmp (make-temporary-file "quoted~a.rkt"))
+      (call-with-output-file tmp
+                             #:exists 'truncate/replace
+                             (lambda (out)
+                               (display "#lang racket/base\n" out)
+                               (display "(require recspecs)\n\n" out)
+                               ;; Regular quoted string expectations
+                               (display "(expect (display \"hello\") \"wrong1\")\n" out)
+                               (display "(expect (display \"world\") \"wrong2\")\n" out)
+                               (display "(expect (display \"test\") \"wrong3\")\n" out)))
+      (define tmp-str (path->string tmp))
+      (putenv "RECSPECS_UPDATE" "1")
+      (putenv "RECSPECS_UPDATE_TEST" tmp-str)
+      (dynamic-require tmp #f)
+      (flush-pending-updates!)
+      (putenv "RECSPECS_UPDATE" "")
+      (putenv "RECSPECS_UPDATE_TEST" "")
+      (define expected
+        (string-append "#lang racket/base\n"
+                       "(require recspecs)\n\n"
+                       "(expect (display \"hello\") \"hello\")\n"
+                       "(expect (display \"world\") \"world\")\n"
+                       "(expect (display \"test\") \"test\")\n"))
       (check-equal? (file->string tmp) expected))))
 
 (module+ test
@@ -151,4 +292,5 @@
                syntax-error-tests
                at-exp-empty-tests
                at-exp-base-tests
-               at-exp-newline-tests)))
+               at-exp-newline-tests
+               multi-update-tests)))
