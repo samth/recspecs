@@ -97,8 +97,52 @@ ok
         [(regex #rx"result: ([0-9]+)") (send-input "echo captured: $0")]
         ["captured: 123" (send-input "exit")]))))
 
+(define exit-code-tests
+  (test-suite "exit-code-tests"
+    (test-case "successful command returns 0"
+      @expect/shell["true" #:status 0]{})
+    (test-case "failing command returns non-zero"
+      @expect/shell["false" #:status 1]{})
+    (test-case "cat session returns 0"
+      @expect/shell["cat" #:status 0]{> hi
+hi
+> there
+there
+})))
+
+(define stderr-tests
+  (test-suite "stderr-tests"
+    (test-case "capture stderr with #:port stderr"
+      @expect/shell[(list "/bin/sh" "-c" "echo err >&2") #:port 'stderr]{err
+})
+    (test-case "capture both with #:port both"
+      @expect/shell[(list "/bin/sh" "-c" "echo out; echo err >&2") #:port 'both #:match 'contains]{out
+})))
+
+(define env-tests
+  (test-suite "env-tests"
+    (test-case "custom environment variable"
+      (define env (make-environment-variables))
+      (environment-variables-set! env #"PATH" (environment-variables-ref
+                                                (current-environment-variables) #"PATH"))
+      (environment-variables-set! env #"MY_VAR" #"hello123")
+      @expect/shell[(list "/bin/sh" "-c" "echo $MY_VAR") #:env env]{>
+hello123
+})))
+
+(define match-mode-tests
+  (test-suite "shell-match-mode-tests"
+    (test-case "contains match"
+      @expect/shell[(list "/bin/sh" "-c" "echo 'hello world'") #:match 'contains]{hello})
+    (test-case "regexp match"
+      @expect/shell[(list "/bin/sh" "-c" "echo 'value: 42'") #:match 'regexp]{value: [0-9]+})))
+
 (module+ test
   (run-tests shell-tests)
+  (run-tests exit-code-tests)
+  (run-tests stderr-tests)
+  (run-tests env-tests)
+  (run-tests match-mode-tests)
   ; Comment out pattern tests for now
   ; (run-tests pattern-shell-tests)
   )

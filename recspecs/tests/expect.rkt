@@ -285,6 +285,19 @@
                        "(expect (display \"test\") \"test\")\n"))
       (check-equal? (file->string tmp) expected))))
 
+(define match-mode-tests
+  (test-suite "match-mode-tests"
+    (test-case "contains mode matches substring"
+      (expect (display "hello world") "hello" #:match 'contains))
+    (test-case "contains mode matches middle"
+      (expect (display "foo bar baz") "bar" #:match 'contains))
+    (test-case "regexp mode matches pattern"
+      (expect (display "value: 42") "value: [0-9]+" #:match 'regexp))
+    (test-case "regexp mode matches anywhere"
+      (expect (display "the answer is 42!") "[0-9]+" #:match 'regexp))
+    (test-case "equal mode is default"
+      (expect (display "exact") "exact"))))
+
 (module+ test
   (run-tests (test-suite "all"
                expect-tests
@@ -293,4 +306,5 @@
                at-exp-empty-tests
                at-exp-base-tests
                at-exp-newline-tests
-               multi-update-tests)))
+               multi-update-tests
+               match-mode-tests)))

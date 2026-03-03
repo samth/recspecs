@@ -39,7 +39,9 @@
                        [recspecs-output-filter (parameter/c (-> string? string?))]
                        [recspecs-runner (parameter/c (-> (-> any/c) any/c))]
                        [capture-output
-                        (->* ((-> any/c)) (#:port (symbols 'stdout 'stderr 'both)) string?)]))
+                        (->* ((-> any/c)) (#:port (symbols 'stdout 'stderr 'both)) string?)]
+                       [capture-output/split
+                        (-> (-> any/c) (values string? string?))]))
 
 ;; When enabled, expectation output is printed to the actual output
 ;; port as it is produced. The parameter defaults to #t when the
@@ -62,6 +64,25 @@
   (define e (make-expectation))
   (with-expectation e #:port port (thunk))
   (expectation-out e))
+
+;; Run @racket[thunk] and return separate stdout and stderr strings.
+;; When @racket[recspecs-verbose?] is true the output is also echoed
+;; to the original ports.
+(define (capture-output/split thunk)
+  (define out-str (open-output-string))
+  (define err-str (open-output-string))
+  (define base-out (current-output-port))
+  (define base-err (current-error-port))
+  (define port-out (if (recspecs-verbose?)
+                       (combine-output base-out out-str)
+                       out-str))
+  (define port-err (if (recspecs-verbose?)
+                       (combine-output base-err err-str)
+                       err-str))
+  (parameterize ([current-output-port port-out]
+                 [current-error-port port-err])
+    (thunk))
+  (values (get-output-string out-str) (get-output-string err-str)))
 
 ;; ----------------------------------------------------------------------
 ;; expectation struct and helpers
@@ -95,18 +116,19 @@
               [port-err (if (recspecs-verbose?)
                             (combine-output base-err out)
                             out)])
-         (cond
-           [(eq? port 'both)
-            (parameterize ([current-output-port port-out]
-                           [current-error-port port-err])
-              body ...)]
-           [(eq? port 'stderr)
-            (parameterize ([current-error-port port-err])
-              body ...)]
-           [else
-            (parameterize ([current-output-port port-out])
-              body ...)])
-         (set-expectation-out! e (string-append (expectation-out e) (get-output-string out))))]))
+         (begin0
+           (cond
+             [(eq? port 'both)
+              (parameterize ([current-output-port port-out]
+                             [current-error-port port-err])
+                body ...)]
+             [(eq? port 'stderr)
+              (parameterize ([current-error-port port-err])
+                body ...)]
+             [else
+              (parameterize ([current-output-port port-out])
+                body ...)])
+           (set-expectation-out! e (string-append (expectation-out e) (get-output-string out)))))]))
 
 ;; Normalize a string by trimming leading and trailing whitespace and removing
 ;; common indentation from all lines. This is used when comparing expectation
@@ -295,7 +317,9 @@
                     span
                     [update update-file]
                     #:strict [strict? #f]
-                    #:port [port 'stdout])
+                    #:port [port 'stdout]
+                    #:status [expected-status #f]
+                    #:match [match-mode 'equal])
   ;; Returns a rackunit test that evaluates `thunk`, captures anything printed
   ;; to the current output port and compares it to `expected`. When update mode
   ;; is enabled and the values differ, the source file is rewritten instead of
@@ -306,21 +330,27 @@
         "expect"))
   (test-case name
     (define e (make-expectation))
-    (with-expectation e #:port port ((recspecs-runner) thunk))
+    (define result (with-expectation e #:port port ((recspecs-runner) thunk)))
     (define actual ((recspecs-output-filter) (expectation-out e)))
     (define comparator
-      (if strict?
-          string=?
-          (lambda (e a) (string=? (normalize-string a) (normalize-string e)))))
+      (case match-mode
+        [(contains) (lambda (e a) (string-contains? a e))]
+        [(regexp) (lambda (e a) (and (regexp-match? e a) #t))]
+        [else
+         (if strict?
+             string=?
+             (lambda (e a) (string=? (normalize-string a) (normalize-string e))))]))
     (define equal? (comparator expected actual))
     (cond
-      [(and path (update-mode? name) (not equal?))
+      [(and path (update-mode? name) (not equal?) (eq? match-mode 'equal))
        (apply-update-with-offset path pos span actual update)
        (commit-expectation! e)
        (printf "Updated expectation in ~a\n" path)]
       [equal?
        (commit-expectation! e)
-       (check comparator expected actual)]
+       (check comparator expected actual)
+       (when expected-status
+         (check-equal? result expected-status))]
       [else
        (skip-expectation! e)
        (define color? (and (terminal-port? (current-error-port)) (not (getenv "NO_COLOR"))))
@@ -392,13 +422,16 @@
     [(_ expr
         expected-first:str
         expected-rest:str ...
-        (~optional (~seq #:strict? s?) 
+        (~optional (~seq #:strict? s?)
                    #:defaults ([s? #'#f]))
-        (~optional (~seq #:port st?) 
-                   #:defaults ([st? #''stdout])))
+        (~optional (~seq #:port st?)
+                   #:defaults ([st? #''stdout]))
+        (~optional (~seq #:match mt?)
+                   #:defaults ([mt? #''equal])))
      #:declare expr (expr/c #'any/c #:name "expression")
      #:declare s? (expr/c #'boolean? #:name "boolean value")
      #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both) #:name "port symbol ('stdout, 'stderr, or 'both)")
+     #:declare mt? (expr/c #'(symbols 'equal 'contains 'regexp) #:name "match mode ('equal, 'contains, or 'regexp)")
      (define expect-list (syntax->list #'(expected-first expected-rest ...)))
      (define first #'expected-first)
      (define last-syn
@@ -417,24 +450,29 @@
                    #,pos
                    #,span
                    #:strict s?
-                   #:port st?)]
+                   #:port st?
+                   #:match mt?)]
     ;; Pattern with single expectation string
     [(_ expr
         expected
         (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
-        (~optional (~seq #:port st?) #:defaults ([st? #''stdout])))
+        (~optional (~seq #:port st?) #:defaults ([st? #''stdout]))
+        (~optional (~seq #:match mt?) #:defaults ([mt? #''equal])))
      #:declare expr (expr/c #'any/c #:name "expression")
      #:declare expected (expr/c #'string? #:name "expectation string")
      #:declare s? (expr/c #'boolean? #:name "boolean value")
      #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both) #:name "port symbol ('stdout, 'stderr, or 'both)")
-     #'(run-expect (lambda () expr) expected #f 0 0 #:strict s? #:port st?)]
+     #:declare mt? (expr/c #'(symbols 'equal 'contains 'regexp) #:name "match mode ('equal, 'contains, or 'regexp)")
+     #'(run-expect (lambda () expr) expected #f 0 0 #:strict s? #:port st? #:match mt?)]
     ;; Pattern with no expectation string
     [(_ expr
         (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
-        (~optional (~seq #:port st?) #:defaults ([st? #''stdout])))
+        (~optional (~seq #:port st?) #:defaults ([st? #''stdout]))
+        (~optional (~seq #:match mt?) #:defaults ([mt? #''equal])))
      #:declare expr (expr/c #'any/c #:name "expression")
      #:declare s? (expr/c #'boolean? #:name "boolean value")
      #:declare st? (expr/c #'(symbols 'stdout 'stderr 'both) #:name "port symbol ('stdout, 'stderr, or 'both)")
+     #:declare mt? (expr/c #'(symbols 'equal 'contains 'regexp) #:name "match mode ('equal, 'contains, or 'regexp)")
      (define src (syntax-source stx))
      (define pos (syntax-position stx))
      (define span (syntax-span stx))
@@ -448,12 +486,13 @@
                        #,span
                        update-file-empty
                        #:strict s?
-                       #:port st?)
-         #'(run-expect (lambda () expr) "" #f 0 0 #:strict s? #:port st?))]
+                       #:port st?
+                       #:match mt?)
+         #'(run-expect (lambda () expr) "" #f 0 0 #:strict s? #:port st? #:match mt?))]
     ;; Generic error case (includes empty form)
     [_
-     (raise-syntax-error 'expect 
-                         "bad syntax\n  expected: (expect expr [expected-string ...] [#:strict? boolean] [#:port port-symbol])" 
+     (raise-syntax-error 'expect
+                         "bad syntax\n  expected: (expect expr [expected-string ...] [#:strict? boolean] [#:port port-symbol] [#:match match-mode])"
                          stx)]))
 
 (define-syntax (expect-file stx)

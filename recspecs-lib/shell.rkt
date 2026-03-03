@@ -90,13 +90,27 @@
     (set! entries (append entries (list (cons current outs)))))
   entries)
 
-(define (shell-run cmd transcript)
+(define (shell-run cmd transcript #:port [port 'stdout] #:env [env #f])
   (define steps (parse-transcript transcript))
   (define-values (out in pid err ctrl)
     (apply values
-           (if (list? cmd)
-               (apply process* cmd)
-               (process cmd))))
+           (let ([launch (lambda ()
+                           (if (list? cmd)
+                               (apply process* cmd)
+                               (process cmd)))])
+             (if env
+                 (parameterize ([current-environment-variables env])
+                   (launch))
+                 (launch)))))
+  ;; When port is 'both, copy stderr lines to current-output-port in background
+  (when (eq? port 'both)
+    (thread (lambda ()
+              (let loop ()
+                (define line (read-line err))
+                (unless (eof-object? line)
+                  (displayln line)
+                  (loop))))))
+  (define read-port (if (eq? port 'stderr) err out))
   (for ([step steps])
     (define input (car step))
     (display "> ")
@@ -106,16 +120,17 @@
       (newline in)
       (flush-output in))
     (for ([ign (in-list (cdr step))])
-      (define line (read-line out))
+      (define line (read-line read-port))
       (unless (eof-object? line)
         (displayln line))))
   (close-output-port in)
   (let loop ()
-    (define line (read-line out))
+    (define line (read-line read-port))
     (unless (eof-object? line)
       (displayln line)
       (loop)))
-  (ctrl 'wait))
+  (ctrl 'wait)
+  (ctrl 'exit-code))
 
 ;; Enhanced shell runner with pattern matching
 (define (shell-run-patterns cmd patterns #:timeout [default-timeout 30])
@@ -212,13 +227,26 @@
                [new-result (string-replace result placeholder value)])
           (loop new-result (+ i 1) (cdr var-list))))))
 
-(define (run-expect-shell cmd transcript path pos span #:strict [strict? #f])
-  (run-expect (lambda () (shell-run cmd transcript)) transcript path pos span #:strict strict?))
+(define (run-expect-shell cmd transcript path pos span
+                          #:strict [strict? #f]
+                          #:status [expected-status #f]
+                          #:port [port 'stdout]
+                          #:env [env #f]
+                          #:match [match-mode 'equal])
+  (run-expect (lambda () (shell-run cmd transcript #:port port #:env env))
+              transcript path pos span
+              #:strict strict?
+              #:status expected-status
+              #:match match-mode))
 
 (define-syntax (expect/shell stx)
   (syntax-parse stx
     [(_ cmd
-	(~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
+        (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
+        (~optional (~seq #:status st?) #:defaults ([st? #'#f]))
+        (~optional (~seq #:port pt?) #:defaults ([pt? #''stdout]))
+        (~optional (~seq #:env en?) #:defaults ([en? #'#f]))
+        (~optional (~seq #:match mt?) #:defaults ([mt? #''equal]))
         expected-first:str
         expected-rest:str ...)
      #:declare cmd (expr/c #'any/c)
@@ -240,14 +268,24 @@
                          #,(and src (path->string src))
                          #,pos
                          #,span
-                         #:strict s?)]
-    [(_ cmd (~optional (~seq #:strict? s?) #:defaults ([s? #'#f])))
+                         #:strict s?
+                         #:status st?
+                         #:port pt?
+                         #:env en?
+                         #:match mt?)]
+    [(_ cmd
+        (~optional (~seq #:strict? s?) #:defaults ([s? #'#f]))
+        (~optional (~seq #:status st?) #:defaults ([st? #'#f]))
+        (~optional (~seq #:port pt?) #:defaults ([pt? #''stdout]))
+        (~optional (~seq #:env en?) #:defaults ([en? #'#f]))
+        (~optional (~seq #:match mt?) #:defaults ([mt? #''equal])))
      #:declare cmd (expr/c #'any/c)
      #:declare s? (expr/c #'boolean?)
      (define src (syntax-source stx))
      (define pos (syntax-position stx))
      (define span (syntax-span stx))
-     #'(run-expect-shell cmd "" #,(and src (path->string src)) #,pos #,span #:strict s?)]))
+     #`(run-expect-shell cmd "" #,(and src (path->string src)) #,pos #,span
+                         #:strict s? #:status st? #:port pt? #:env en? #:match mt?)]))
 
 ;; New enhanced expect/shell with pattern matching
 (define-syntax (expect/shell/patterns stx)

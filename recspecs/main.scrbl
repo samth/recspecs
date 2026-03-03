@@ -67,11 +67,24 @@ usage with a new custodian and redirect the error port:
               (make-bytes (* 2 1024 1024)))
             "oops"))]
 
-@defform[(expect expr expected-str ...)]{
+@defform[(expect expr expected-str ... maybe-keywords)
+         #:grammar
+         ([maybe-keywords (code:line)
+                          (code:line #:strict? strict?-expr)
+                          (code:line #:port port-expr)
+                          (code:line #:match match-expr)])]{
 Evaluates @racket[expr] and checks that the captured output is equal to
 the concatenation of @racket[expected-str]s. If they differ and
 @tt{RECSPECS_UPDATE} is set, the expectation string in the source file
 is replaced with the new value.  Otherwise the test case fails.
+
+Use @racket[#:match 'contains] to check that the output contains the
+expected string as a substring, or @racket[#:match 'regexp] to treat the
+expected string as a regular expression.
+
+@racketblock[
+  (expect (display "hello world") "hello" #:match 'contains)
+  (expect (display "value: 42") "value: [0-9]+" #:match 'regexp)]
 }
 
 @racketblock[
@@ -145,6 +158,22 @@ original port(s).
             #:port 'both)]
 }
 
+@defproc[(capture-output/split [thunk (-> any/c)]) (values string? string?)]{
+Runs @racket[thunk] and returns two values: the stdout output and the stderr
+output as separate strings. When @racket[recspecs-verbose?] is true, both
+streams are echoed to their original ports.
+
+@racketblock[
+  (define-values (out err)
+    (capture-output/split
+      (lambda ()
+        (display "normal output")
+        (display "error output" (current-error-port)))))
+  out   ; => "normal output"
+  err   ; => "error output"
+]
+}
+
 @defstruct[expectation ([out string?]
                         [committed? boolean?]
                         [skip? boolean?])]{
@@ -181,11 +210,27 @@ access the captured output with @racket[expectation-out]:
           [pos exact-nonnegative-integer?]
           [span exact-nonnegative-integer?]
           [#:strict strict? boolean? #f]
-          [#:port port (symbols 'stdout 'stderr 'both) 'stdout])
+          [#:port port (symbols 'stdout 'stderr 'both) 'stdout]
+          [#:status status (or/c #f exact-integer?) #f]
+          [#:match match-mode (symbols 'equal 'contains 'regexp) 'equal])
          void?]{
 Runs @racket[thunk] and checks that the captured output matches
 @racket[expected].  The @racket[path], @racket[pos] and @racket[span]
 identify the source location used when updating.
+
+When @racket[status] is not @racket[#f], the return value of
+@racket[thunk] is also checked against @racket[status] using
+@racket[check-equal?].
+
+The @racket[match-mode] controls how the comparison is performed:
+@itemlist[
+@item{@racket['equal] (default) — exact string equality (modulo whitespace normalization when not strict)}
+@item{@racket['contains] — passes when the actual output contains @racket[expected] as a substring}
+@item{@racket['regexp] — passes when @racket[expected] matches the actual output as a regular expression}
+]
+
+Update mode is skipped for non-@racket['equal] match modes since
+substring and regexp patterns cannot be auto-derived from output.
 }
 
 @defproc[(run-expect-exn
@@ -219,12 +264,25 @@ testing and advanced pattern-based automation.
 
 @subsection{Basic Shell Testing}
 
-@defform[(expect/shell cmd-expr expected-str ...)]{
+@defform[(expect/shell cmd-expr option ... expected-str ...)
+         #:grammar
+         ([option (code:line #:strict? strict?-expr)
+                  (code:line #:status status-expr)
+                  (code:line #:port port-expr)
+                  (code:line #:env env-expr)
+                  (code:line #:match match-expr)])]{
 Run @racket[cmd-expr] as a subprocess and compare the interaction
 against @racket[expected-str ...].  Lines in the expectation that begin
 with @litchar{>} are sent to the process as input (without the prompt).
 The command's responses are captured and the full transcript is checked
 against the expectation.
+
+@racket[#:status] checks the subprocess exit code (e.g., @racket[0] for
+success). @racket[#:port] selects which stream to read
+(@racket['stdout], @racket['stderr], or @racket['both]).
+@racket[#:env] accepts an @racket[environment-variables?] value to set
+the subprocess environment.  @racket[#:match] controls comparison mode
+(@racket['equal], @racket['contains], or @racket['regexp]).
 }
 @racketblock[
   (require recspecs/shell)
