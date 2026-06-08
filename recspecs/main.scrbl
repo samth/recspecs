@@ -3,56 +3,198 @@
 @title{recspecs: Expect Testing for Racket}
 @defmodule[recspecs]
 
+@section{Getting Started}
+
+Recspecs is useful when the easiest way to check a program is to look at
+what it prints. Instead of writing assertions for every small value, you
+run the code and keep the expected transcript next to the code that
+produced it.
+
+A minimal test file looks like this:
+
+@racketblock[
+  (require recspecs)
+
+  (expect (displayln "hello")
+          "hello\n")]
+
 The @racket[expect] form captures anything printed to the current output
-port while evaluating an expression and compares it to a string literal
-stored directly in the source file.  Each use expands to a
-RackUnit @racket[test-case].  When the environment variable
-@tt{RECSPECS_UPDATE} is set and the expectation does not match, the file
-is rewritten with the new output instead of failing the test.  When
-@tt{RECSPECS_UPDATE} is not set and the expectation fails, a colorized
-diff is printed to help understand the mismatch. Updating can be
-restricted to a single test case by setting
-@tt{RECSPECS_UPDATE_TEST} to the name shown for that case.
+port while @racket[expr] runs. It compares that captured output to the
+expected string in the source file, and each @racket[expect] expands to a
+RackUnit @racket[test-case]. You can run the file with @exec{raco test}:
+
+@verbatim|{raco test hello-test.rkt}|
+
+@section{Writing Readable Expectations with @tt{#lang at-exp racket}}
+
+Most expect tests are easiest to read with Racket's @racketmodname[at-exp]
+reader. Start the file with @racketfont{#lang at-exp racket} instead of plain
+@racketfont{#lang racket}, then put @litchar|{@}| before @racket[expect]. The
+expression to run goes in square brackets, and the expected output goes in
+braces:
+
+@racketblock[#:lang at-exp racket
+  (require recspecs)
+
+  @expect[(displayln "hello")]{
+  hello
+  }]
+
+The @litchar|{@}| form is just reader syntax for an ordinary function or
+macro call. The example above is equivalent to writing an @racket[expect]
+form with a string argument, but the expected output can be written as the
+text you want to see instead of as a string with @racket["\\n"] escapes.
+
+Here is a slightly more realistic example that checks a report:
+
+@racketblock[#:lang at-exp racket
+  (require recspecs)
+
+  (define (print-shopping-list items)
+    (for ([item items]
+          [n (in-naturals 1)])
+      (printf "~a. ~a\n" n item)))
+
+  @expect[(print-shopping-list '("apples" "bread" "coffee"))]{
+  1. apples
+  2. bread
+  3. coffee
+  }]
+
+Use this style when the expected output has more than one line or when the
+literal output is clearer than a Racket string. For one-line output, a
+plain string is still fine.
+
+@section{Updating Recorded Output}
+
+When the output intentionally changes, rerun the test with
+@tt{RECSPECS_UPDATE} set. If an expectation does not match, recspecs
+rewrites the expectation in the source file with the new output instead of
+failing the test:
+
+@verbatim|{RECSPECS_UPDATE=1 raco test shopping-list-test.rkt}|
+
+After reviewing the rewritten file, run the tests normally again. Updating
+can be restricted to a single test case by setting @tt{RECSPECS_UPDATE_TEST}
+to the name shown for that case.
+
+@section{Common First Use Cases}
+
+@subsection{Testing Printed Output}
+
+Use @racket[expect] when the behavior you care about is what the code
+prints:
+
+@racketblock[#:lang at-exp racket
+  (require recspecs)
+
+  (define (greet name)
+    (printf "Hello, ~a!\n" name))
+
+  @expect[(greet "Ada")]{
+  Hello, Ada!
+  }]
+
+@subsection{Testing Printed Values}
+
+Use @racket[expect/print] when you want to test the value an expression
+returns. Recspecs prints the value with @racket[print] before comparing it:
+
+@racketblock[#:lang at-exp racket
+  (require recspecs)
+
+  @expect/print[(map string-upcase '("red" "blue"))]{
+  '("RED" "BLUE")
+  }]
+
+Use @racket[expect/pretty] for data that is easier to inspect with
+@racket[pretty-print]:
+
+@racketblock[#:lang at-exp racket
+  (require recspecs)
+
+  @expect/pretty['(shopping-list
+                  (item "apples")
+                  (item "bread")
+                  (item "coffee"))]{
+  '(shopping-list
+    (item "apples")
+    (item "bread")
+    (item "coffee"))
+  }]
+
+@subsection{Testing Error Messages}
+
+Use @racket[expect-exn] when the expected behavior is an exception:
+
+@racketblock[#:lang at-exp racket
+  (require recspecs)
+
+  (define (parse-port n)
+    (unless (and (integer? n) (<= 0 n 65535))
+      (raise-user-error 'parse-port "expected an integer from 0 to 65535"))
+    n)
+
+  @expect-exn[(parse-port 70000)]{
+  parse-port: expected an integer from 0 to 65535
+  }]
+
+@subsection{Capturing Output Without an Expectation}
+
+Use @racket[capture-output] when you need the printed text as a string for
+some other assertion or helper:
+
+@racketblock[
+  (require recspecs rackunit)
+
+  (define out
+    (capture-output
+     (lambda ()
+       (display "ready"))))
+
+  (check-equal? out "ready")]
+
+@section{Daily Workflow and Options}
 
 Verbose mode can be enabled by setting @tt{RECSPECS_VERBOSE} or by
-parameterizing @racket[recspecs-verbose?]. When enabled, captured
-output is echoed to the real output port as it is produced.
-For example:
+parameterizing @racket[recspecs-verbose?]. When enabled, captured output is
+echoed to the real output port as it is produced:
 
 @verbatim|{RECSPECS_VERBOSE=1 raco test my-test.rkt}|
 
 For Emacs users, the accompanying @filepath{emacs/recspecs.el} file
-provides @racketfont{recspecs-update-at-point}, which runs the current
-file under @exec{racket-test} with those environment variables set for
-the expectation at the cursor position. After the test finishes the
-buffer is automatically reverted so that any updated expectations are
-reloaded from disk.
+provides @racketfont{recspecs-update-at-point}, which runs the current file
+under @exec{racket-test} with the update environment variables set for the
+expectation at the cursor position. After the test finishes the buffer is
+automatically reverted so that any updated expectations are reloaded from
+disk.
 
-Use @racket[#:port 'stderr] with @racket[expect], @racket[expect-file],
-@racket[expect-exn], or @racket[capture-output] to record output written
-to the current error port instead of the output port. Pass
-@racket['both] to capture from both ports simultaneously.
+Use @racket[#:port] @racket['stderr] with @racket[expect], @racket[expect-file], or
+@racket[capture-output] to record output written to the current error port
+instead of the output port. Pass @racket['both] to capture from both ports
+simultaneously:
+
+@racketblock[#:lang at-exp racket
+  (require recspecs)
+
+  @expect[(display "oops" (current-error-port))
+          #:port 'stderr]{
+  oops
+  }]
 
 Output can be transformed before it is compared by parameterizing
 @racket[recspecs-output-filter]. The parameter holds a procedure that
-receives the captured string and returns a new string used for the
-comparison and when updating:
+receives the captured string and returns a new string used for comparison
+and updating. For example, trim incidental surrounding whitespace:
 
-@racketblock[
-  (parameterize ([recspecs-output-filter
-                  (lambda (s) (regexp-replace* #px"[0-9]+" s ""))])
-    (expect (display "v1.2") "v."))]
-@racketblock[
-  (parameterize ([recspecs-output-filter string-upcase])
-    (expect (display "ok") "OK"))]
 @racketblock[
   (parameterize ([recspecs-output-filter string-trim])
     (expect (display "  hi  ") "hi"))]
 
 The thunk that performs the test is executed via the procedure stored in
-@racket[recspecs-runner].  The default simply calls the thunk, but it can
-be replaced to control the runtime context. For example, limit memory
-usage with a new custodian and redirect the error port:
+@racket[recspecs-runner]. The default simply calls the thunk, but advanced
+tests can replace it to control the runtime context. For example, you can
+limit memory usage with a new custodian and redirect the error port:
 
 @racketblock[
   (parameterize ([recspecs-runner
@@ -67,20 +209,26 @@ usage with a new custodian and redirect the error port:
               (make-bytes (* 2 1024 1024)))
             "oops"))]
 
-@defform[(expect expr expected-str ... maybe-keywords)
-         #:grammar
-         ([maybe-keywords (code:line)
-                          (code:line #:strict? strict?-expr)
-                          (code:line #:port port-expr)
-                          (code:line #:match match-expr)])]{
-Evaluates @racket[expr] and checks that the captured output is equal to
-the concatenation of @racket[expected-str]s. If they differ and
-@tt{RECSPECS_UPDATE} is set, the expectation string in the source file
-is replaced with the new value.  Otherwise the test case fails.
 
-Use @racket[#:match 'contains] to check that the output contains the
-expected string as a substring, or @racket[#:match 'regexp] to treat the
-expected string as a regular expression.
+@section{Reference}
+@defform[(expect expr expected-str ...
+                 [#:strict? strict?-expr #f]
+                 [#:port port-expr 'stdout]
+                 [#:match match-expr 'equal])]{
+Evaluates @racket[expr] and checks that the captured output is equal to
+the concatenation of @racket[expected-str]s.
+
+@racket[#:strict?] controls whitespace comparison. When false, comparison
+ignores surrounding whitespace and common indentation. When true, comparison
+uses exact string equality. @racket[#:port] accepts @racket['stdout],
+@racket['stderr], or @racket['both]. @racket[#:match] accepts
+@racket['equal], @racket['contains], or @racket['regexp].
+
+If the expectation differs and @tt{RECSPECS_UPDATE} is set, the expectation
+string in the source file is replaced with the new value. Otherwise the test
+case fails. Update mode is skipped for @racket['contains] and
+@racket['regexp] because recspecs cannot infer the intended substring or
+regular expression from the actual output.
 
 @racketblock[
   (expect (display "hello world") "hello" #:match 'contains)
@@ -101,21 +249,35 @@ expectations:
   hello
   3}]
 
-@defform[(expect/print expr expected-str ...)]{
+@defform[(expect/print expr expected-str ...
+                       [#:strict? strict?-expr #f]
+                       [#:port port-expr 'stdout]
+                       [#:match match-expr 'equal])]{
 Like @racket[expect], but the result of @racket[expr] is printed with
-@racket[print] before comparison.  This is shorthand for
-@racket[(expect (print expr) expected-str ...)].
+@racket[print] before comparison. This is shorthand for
+@racket[(expect (print expr) expected-str ...)]. It accepts the same
+@racket[#:strict?], @racket[#:port], and @racket[#:match] keywords as
+@racket[expect], with defaults shown in the form above.
 }
 
-@defform[(expect/pretty expr expected-str ...)]{
+@defform[(expect/pretty expr expected-str ...
+                        [#:strict? strict?-expr #f]
+                        [#:port port-expr 'stdout]
+                        [#:match match-expr 'equal])]{
 Like @racket[expect/print], but uses @racket[pretty-print] to output the
-result.  The newline produced by @racket[pretty-print] is included in the
-expectation.
+result. The newline produced by @racket[pretty-print] is included in the
+expectation. It accepts the same @racket[#:strict?], @racket[#:port], and
+@racket[#:match] keywords as @racket[expect], with defaults shown in the
+form above.
 }
 
-@defform[(expect-file expr path-str)]{
+@defform[(expect-file expr path-str
+                       [#:strict? strict?-expr #f]
+                       [#:port port-expr 'stdout])]{
 Reads the expectation from @racket[path-str] instead of embedding it in the
 source. The file is replaced with new output when @tt{RECSPECS_UPDATE} is set.
+@racket[#:port] accepts @racket['stdout], @racket['stderr], or
+@racket['both].
 }
 @racketblock[
   (expect-file
@@ -124,10 +286,14 @@ source. The file is replaced with new output when @tt{RECSPECS_UPDATE} is set.
       (displayln "world"))
     "expected.txt")]
 
-@defform[(expect-exn expr expected-str ...)]{
+@defform[(expect-exn expr expected-str ...
+                      [#:strict? strict?-expr #f]
+                      [#:port port-expr 'stdout])]{
 Checks that @racket[expr] raises an exception whose message matches the
 concatenation of @racket[expected-str]s. The message is updated when
-update mode is enabled.
+update mode is enabled. @racket[#:port] is accepted for consistency with
+the other expectation forms; @racket[expect-exn] compares the exception
+message rather than captured output.
 }
 @racketblock[
   (expect-exn (raise-user-error "bad")
@@ -142,7 +308,7 @@ failing.
   (when #f
     (expect-unreachable (displayln "never")))]
 
-@defproc[(capture-output [thunk (-> any/c)] [#:port port any/c 'stdout]) string?]{
+@defproc[(capture-output [thunk (-> any/c)] [#:port port (symbols 'stdout 'stderr 'both) 'stdout]) string?]{
 Runs @racket[thunk] and returns everything printed to the selected port(s).
 When @racket[port] is @racket['stderr], the current error port is captured
 instead of the output port. Pass @racket['both] to capture from both ports.
@@ -188,9 +354,10 @@ append to @racket[out].}
 
 @defproc[(skip-expectation! [e expectation?]) void?]{Mark @racket[e] as skipped.}
 
-@defform[(with-expectation e expr ...)]{
+@defform[(with-expectation e [#:port port-expr 'stdout] expr ...)]{
 Evaluates the @racket[expr]s and appends anything printed to
-@racket[e]'s @racket[out] field.}
+@racket[e]'s @racket[out] field. @racket[#:port] accepts @racket['stdout],
+@racket['stderr], or @racket['both].}
 
 You can wrap any of the expectation forms with @racket[with-expectation] and
 access the captured output with @racket[expectation-out]:
@@ -243,7 +410,9 @@ substring and regexp patterns cannot be auto-derived from output.
           [#:port port (symbols 'stdout 'stderr 'both) 'stdout])
          void?]{
 Like @racket[run-expect] but expects @racket[thunk] to raise an
-exception whose message matches @racket[expected].
+exception whose message matches @racket[expected]. The @racket[#:port]
+keyword is accepted for consistency with expectation forms, but the
+comparison is against the exception message.
 }
 
 @defproc[(update-file-entire
@@ -264,25 +433,24 @@ testing and advanced pattern-based automation.
 
 @subsection{Basic Shell Testing}
 
-@defform[(expect/shell cmd-expr option ... expected-str ...)
-         #:grammar
-         ([option (code:line #:strict? strict?-expr)
-                  (code:line #:status status-expr)
-                  (code:line #:port port-expr)
-                  (code:line #:env env-expr)
-                  (code:line #:match match-expr)])]{
+@defform[(expect/shell cmd-expr
+                         [#:strict? strict?-expr #f]
+                         [#:status status-expr #f]
+                         [#:port port-expr 'stdout]
+                         [#:env env-expr #f]
+                         [#:match match-expr 'equal]
+                         expected-str ...)]{
 Run @racket[cmd-expr] as a subprocess and compare the interaction
-against @racket[expected-str ...].  Lines in the expectation that begin
+against @racket[expected-str ...]. Lines in the expectation that begin
 with @litchar{>} are sent to the process as input (without the prompt).
 The command's responses are captured and the full transcript is checked
 against the expectation.
 
-@racket[#:status] checks the subprocess exit code (e.g., @racket[0] for
-success). @racket[#:port] selects which stream to read
-(@racket['stdout], @racket['stderr], or @racket['both]).
-@racket[#:env] accepts an @racket[environment-variables?] value to set
-the subprocess environment.  @racket[#:match] controls comparison mode
-(@racket['equal], @racket['contains], or @racket['regexp]).
+@racket[#:status] accepts an exact integer, such as @racket[0], to check
+the subprocess exit code. @racket[#:port] accepts @racket['stdout],
+@racket['stderr], or @racket['both]. @racket[#:env] accepts an
+@racket[environment-variables?] value. @racket[#:match] accepts
+@racket['equal], @racket['contains], or @racket['regexp].
 }
 @racketblock[
   (require recspecs/shell)
@@ -299,11 +467,12 @@ the subprocess environment.  @racket[#:match] controls comparison mode
 For complex interactive scenarios, @racket[expect/shell/patterns] provides a 
 declarative pattern-matching approach similar to the Unix @exec{expect} tool.
 
-@defform[(expect/shell/patterns cmd-expr option ... [pattern action] ...)
+@defform[(expect/shell/patterns cmd-expr
+                                  [#:timeout timeout-expr 30]
+                                  [#:strict? strict?-expr #f]
+                                  [pattern action] ...)
          #:grammar
-         ([option (code:line #:timeout timeout-expr)
-                  (code:line #:strict? strict?-expr)]
-          [pattern string-expr
+         ([pattern string-expr
                    (code:line (exact string-expr))
                    (code:line (regex regex-expr))
                    (code:line (glob glob-string-expr))
@@ -315,15 +484,9 @@ declarative pattern-matching approach similar to the Unix @exec{expect} tool.
                   (code:line (error message-expr))
                   procedure-expr])]{
 
-Runs @racket[cmd-expr] as an interactive subprocess and processes output using 
-pattern/action pairs. Each pattern is matched against the accumulated output, and 
+Runs @racket[cmd-expr] as an interactive subprocess and processes output using
+pattern/action pairs. Each pattern is matched against the accumulated output, and
 when matched, the corresponding action is executed.
-
-@bold{Options:}
-@itemlist[
-@item{@racket[#:timeout] — Sets the default timeout in seconds for the entire session (default: 30)}
-@item{@racket[#:strict?] — Controls whether whitespace normalization is applied (default: @racket[#f])}
-]
 
 @bold{Patterns:}
 @itemlist[
