@@ -4,11 +4,66 @@
 inspired by [Jane Street's `expect_test` for OCaml](https://github.com/janestreet/ppx_expect)
 and the [`expect-test` crate](https://github.com/rust-analyzer/expect-test) for Rust.
 
-Expect tests record the output of expressions directly in the source file.
-Each `expect` form expands to a small RackUnit test that compares the
-captured output against the recorded expectation. When the environment
-variable `RECSPECS_UPDATE` is set, failing expectations are automatically
-updated in the file instead of causing a failure.
+Expect tests are especially useful when the clearest behavior to check is
+what a function prints. Put the code that produces output next to the output
+you expect, run the file with `raco test`, and review the saved transcript
+when behavior changes. Each `expect` form expands to a small RackUnit test.
+When the environment variable `RECSPECS_UPDATE` is set, failing expectations
+are automatically updated in the file instead of causing a failure.
+
+For readable multi-line examples, use Racket's @-expression reader by
+starting a test file with `#lang at-exp racket`. Then write `@expect[...]`:
+the expression to run goes in square brackets, and the expected output goes
+in braces.
+
+## Getting started
+
+```racket
+#lang at-exp racket
+(require recspecs)
+
+(define (greet name)
+  (printf "Hello, ~a!\n" name))
+
+@expect[(greet "Ada")]{
+Hello, Ada!
+}
+```
+
+The `@expect[...] { ... }` shape is just reader syntax for an ordinary
+`expect` call. It lets the expected output look like the text your program
+prints, instead of a string with `\n` escapes.
+
+A slightly larger example can still stay direct:
+
+```racket
+#lang at-exp racket
+(require recspecs)
+
+(define (print-shopping-list items)
+  (for ([item items]
+        [n (in-naturals 1)])
+    (printf "~a. ~a\n" n item)))
+
+@expect[(print-shopping-list '("apples" "bread" "coffee"))]{
+1. apples
+2. bread
+3. coffee
+}
+```
+
+Run the file normally:
+
+```console
+$ raco test shopping-list-test.rkt
+```
+
+When the output intentionally changes, update the recorded output and then
+review the file:
+
+```console
+$ RECSPECS_UPDATE=1 raco test shopping-list-test.rkt
+```
 
 Additional forms mirror features from the OCaml and Rust libraries:
 
@@ -32,43 +87,41 @@ Additional forms mirror features from the OCaml and Rust libraries:
 * Set `RECSPECS_VERBOSE` or parameterize `recspecs-verbose?` to print
   captured output while tests run.
 * Pass `#:port 'stderr` to capture output from `current-error-port` in
-  `expect`, `expect-file`, `expect-exn`, or `capture-output`. Use `'both`
-  to capture from both output ports at once.
+  `expect`, `expect-file`, or `capture-output`. Use `'both` to capture from
+  both output ports at once.
 * Use `capture-output` to run a thunk and return its printed output.
 
-## Example
+The Scribble reference shows accepted keyword arguments and their defaults in
+each form signature.
 
-```racket
-#lang racket
-(require recspecs)
+## More common examples
 
-(expect
-  (begin
-    (displayln "hello")
-    (displayln (+ 1 2)))
-  "hello\n3\n")
-
-(expect (display "oops" (current-error-port))
-        "oops"
-        #:port 'stderr)
-
-(expect (begin
-          (display "warn" (current-error-port))
-          (display "out"))
-        "warnout"
-        #:port 'both)
-```
-
-Using @ expressions from `#lang at-exp` can make multi-line output
-easier to write:
+Use `expect/print` when you want to check a returned value rather than
+hand-writing a call to `display` or `printf`:
 
 ```racket
 #lang at-exp racket
 (require recspecs)
 
-@expect[(begin (displayln "hello") (displayln (+ 1 2)))]{
-hello
-3}
+@expect/print[(map string-upcase '("red" "blue"))]{
+'("RED" "BLUE")
+}
+```
+
+Use `expect-exn` when the expected behavior is an exception message:
+
+```racket
+#lang at-exp racket
+(require recspecs)
+
+(define (parse-port n)
+  (unless (and (integer? n) (<= 0 n 65535))
+    (raise-user-error 'parse-port "expected an integer from 0 to 65535"))
+  n)
+
+@expect-exn[(parse-port 70000)]{
+parse-port: expected an integer from 0 to 65535
+}
 ```
 
 Mark code that should not run with `expect-unreachable`:
