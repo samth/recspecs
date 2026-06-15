@@ -165,7 +165,12 @@ Automatically print a value before comparing:
 
 ```racket
 (expect/print (+ 1 2) "3")
-(expect/pretty '(1 2 3) "(1 2 3)\n")
+(expect/pretty '(1 2 3) "'(1 2 3)\n")
+```
+
+Check an interactive shell transcript:
+
+```racket
 @expect/shell["cat"]{
 > hi
 hi
@@ -207,15 +212,14 @@ result:
 (commit-expectation! e)
 ```
 
-`with-expectation` can also wrap other recspecs forms. The recorded output is
-available via @racket[expectation-out]:
+The recorded output is available via `expectation-out`:
 
 ```racket
 (define log (make-expectation))
 (with-expectation log
-  (expect (display "hi") "hi"))
+  (display "hi"))
 (commit-expectation! log)
-(displayln (expectation-out log)) ; prints ""
+(displayln (expectation-out log)) ; prints "hi"
 ```
 
 Run the file with `raco test` (or any RackUnit runner) to execute the
@@ -257,4 +261,3 @@ This library is new but relatively-feature complete. However, it hasn't
 been used in anger, so lots of things might change.
 
 Almost all the code here was written by the OpenAI Codex tool
-

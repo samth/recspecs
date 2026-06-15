@@ -25,7 +25,7 @@ RackUnit @racket[test-case]. You can run the file with @exec{raco test}:
 
 @verbatim|{raco test hello-test.rkt}|
 
-@section{Writing Readable Expectations with @tt{#lang at-exp racket}}
+@section[#:tag "at-exp"]{Writing Readable Expectations with @tt{#lang at-exp racket}}
 
 Most expect tests are easiest to read with Racket's @racketmodname[at-exp]
 reader. Start the file with @racketfont{#lang at-exp racket} instead of plain
@@ -114,13 +114,13 @@ Use @racket[expect/pretty] for data that is easier to inspect with
   (require recspecs)
 
   @expect/pretty['(shopping-list
-                  (item "apples")
-                  (item "bread")
-                  (item "coffee"))]{
+                  (item "apples" #:qty 2 #:aisle "produce")
+                  (item "bread" #:qty 1 #:aisle "bakery")
+                  (item "coffee" #:qty 1 #:aisle "dry goods"))]{
   '(shopping-list
-    (item "apples")
-    (item "bread")
-    (item "coffee"))
+    (item "apples" #:qty 2 #:aisle "produce")
+    (item "bread" #:qty 1 #:aisle "bakery")
+    (item "coffee" #:qty 1 #:aisle "dry goods"))
   }]
 
 @subsection{Testing Error Messages}
@@ -359,13 +359,12 @@ Evaluates the @racket[expr]s and appends anything printed to
 @racket[e]'s @racket[out] field. @racket[#:port] accepts @racket['stdout],
 @racket['stderr], or @racket['both].}
 
-You can wrap any of the expectation forms with @racket[with-expectation] and
-access the captured output with @racket[expectation-out]:
+The recorded output is available with @racket[expectation-out]:
 
 @racketblock[
   (define log (make-expectation))
   (with-expectation log
-    (expect (display "hi") "hi"))
+    (display "hi"))
   (commit-expectation! log)
   (displayln (expectation-out log))]
 
@@ -468,16 +467,13 @@ For complex interactive scenarios, @racket[expect/shell/patterns] provides a
 declarative pattern-matching approach similar to the Unix @exec{expect} tool.
 
 @defform[(expect/shell/patterns cmd-expr
-                                  [#:timeout timeout-expr 30]
                                   [#:strict? strict?-expr #f]
                                   [pattern action] ...)
          #:grammar
          ([pattern string-expr
                    (code:line (exact string-expr))
                    (code:line (regex regex-expr))
-                   (code:line (glob glob-string-expr))
-                   (code:line (timeout seconds-expr))
-                   (code:line eof)]
+                   (code:line (glob glob-string-expr))]
           [action (code:line (send-input text-expr))
                   (code:line continue)
                   (code:line retry)
@@ -493,8 +489,6 @@ when matched, the corresponding action is executed.
 @item{@racket[string-expr] or @racket[(exact string-expr)] — Exact string matching}
 @item{@racket[(regex regex-expr)] — Regular expression matching with capture group support}
 @item{@racket[(glob glob-string-expr)] — Glob pattern matching with @litchar{*} and @litchar{?} wildcards}
-@item{@racket[(timeout seconds-expr)] — Matches when the specified timeout is reached}
-@item{@racket[eof] — Matches when the process terminates}
 ]
 
 @bold{Actions:}
@@ -515,12 +509,11 @@ Simple command interaction:
     ["$" (send-input "echo hello")]
     ["hello" (send-input "exit")])]
 
-Using regex patterns with timeout:
+Using regex patterns:
 @racketblock[
-  (expect/shell/patterns "slow-server" #:timeout 60
-    [(regex #rx"Server started on port ([0-9]+)") 
+  (expect/shell/patterns "server"
+    [(regex #rx"Server started on port ([0-9]+)")
      (send-input "connect")]
-    [(timeout 30) (error "Server startup timeout")]
     ["Connected" continue])]
 
 Glob patterns and error handling:
@@ -567,17 +560,6 @@ Variables are referenced as @racket[$0], @racket[$1], @racket[$2], etc., where
     ["Build complete" continue]
     [(glob "*failed*") (error "Build failed")])]
 
-@subsubsection{Timeout Handling}
-
-Individual patterns can specify timeouts, and a global session timeout can be set:
-
-@racketblock[
-  (expect/shell/patterns "long-running-process" #:timeout 300
-    ["Starting..." continue]
-    [(timeout 60) (send-input "status")]  ; Check status after 1 minute
-    ["Progress: 100%" continue]
-    [(timeout 300) (error "Process timeout")])]
-
 @subsubsection{Custom Actions}
 
 For complex logic, actions can be procedures that receive the session state and captured variables:
@@ -612,8 +594,8 @@ can be used directly for testing pattern logic.
 
 @subsection{Error Handling and Debugging}
 
-When patterns fail to match or timeouts occur, @racket[expect/shell/patterns] provides 
-detailed error messages including:
+When patterns fail to match, @racket[expect/shell/patterns] reports details
+including:
 
 @itemlist[
 @item{The accumulated output at the time of failure}
@@ -669,14 +651,6 @@ Matches using regular expressions and captures groups for variable substitution.
 Matches using glob patterns with @litchar{*} and @litchar{?} wildcards.
 }
 
-@defstruct[pattern-timeout ([seconds number?])]{
-Triggers when the specified number of seconds have elapsed.
-}
-
-@defstruct[pattern-eof ()]{
-Triggers when the subprocess terminates or reaches end-of-file.
-}
-
 @defstruct[action-send-text ([text string?])]{
 Sends the specified text to the subprocess as input.
 }
@@ -697,9 +671,9 @@ Raises an error with the specified message.
 Executes a custom procedure with signature @racket[(-> shell-session? list? symbol?)].
 }
 
-@defproc[(shell-run-patterns [cmd (or/c string? (listof string?))] 
-                             [patterns (listof pattern-action?)] 
-                             [#:timeout timeout number? 30]) 
+@defproc[(shell-run-patterns [cmd (or/c string? (listof string?))]
+                             [patterns (listof pattern-action?)]
+                             [#:timeout timeout number? 30])
          void?]{
 Low-level function that runs the pattern-based shell interaction. This function 
 underlies @racket[expect/shell/patterns] and can be used for programmatic control.
@@ -718,11 +692,9 @@ underlies @racket[expect/shell/patterns] and can be used for programmatic contro
 
 @itemlist[
 @item{Use specific patterns to avoid false matches: prefer @racket[(exact "$ ")] over @racket["$"]}
-@item{Include timeout patterns for long-running operations}
 @item{Use @racket[continue] judiciously to handle intermediate output}
 @item{Capture important values with regex patterns for reuse}
 @item{Test pattern logic in isolation using @racket[match-pattern]}
 @item{Enable verbose mode during development for better visibility}
 @item{Consider the order of patterns carefully: more specific patterns should come before general ones}
-@item{Use @racket[eof] patterns to handle unexpected process termination gracefully}
 ]
