@@ -426,9 +426,10 @@ Replace the entire file at @racket[path] with @racket[new-str].
 @section{Shell Commands}
 @defmodule[recspecs/shell]
 
-The @racket[recspecs/shell] module provides tools for testing interactive shell 
-commands, inspired by the Unix @exec{expect} tool. It supports both simple transcript-based 
-testing and advanced pattern-based automation.
+The @racket[recspecs/shell] module provides tools for testing interactive
+shell commands, inspired by the Unix @exec{expect} tool. Use
+@racket[expect/shell] for transcript-based tests. The module also exposes
+experimental pattern-matching helpers for lower-level interactive control.
 
 @subsection{Basic Shell Testing}
 
@@ -451,7 +452,7 @@ the subprocess exit code. @racket[#:port] accepts @racket['stdout],
 @racket[environment-variables?] value. @racket[#:match] accepts
 @racket['equal], @racket['contains], or @racket['regexp].
 }
-@racketblock[
+@racketblock[#:lang at-exp racket
   (require recspecs/shell)
   @expect/shell["cat"]{
   > hi
@@ -461,10 +462,17 @@ the subprocess exit code. @racket[#:port] accepts @racket['stdout],
   }
 ]
 
-@subsection{Pattern-Based Shell Automation}
+@subsection{Experimental Pattern Helpers}
 
-For complex interactive scenarios, @racket[expect/shell/patterns] provides a 
-declarative pattern-matching approach similar to the Unix @exec{expect} tool.
+The pattern interface is experimental. Prefer @racket[expect/shell] for tests
+that can be represented as a transcript. The lower-level pattern helpers are
+useful for testing pattern parsing and for experimenting with interactive
+control, but the current implementation does not implement timeout or EOF
+pattern matching, and a pattern that never matches can block.
+
+@racket[expect/shell/patterns] accepts exact, regexp, and glob patterns plus
+actions that send input, continue, retry, raise an error, or call a custom
+procedure:
 
 @defform[(expect/shell/patterns cmd-expr
                                   [#:strict? strict?-expr #f]
@@ -480,99 +488,12 @@ declarative pattern-matching approach similar to the Unix @exec{expect} tool.
                   (code:line (error message-expr))
                   procedure-expr])]{
 
-Runs @racket[cmd-expr] as an interactive subprocess and processes output using
-pattern/action pairs. Each pattern is matched against the accumulated output, and
-when matched, the corresponding action is executed.
-
-@bold{Patterns:}
-@itemlist[
-@item{@racket[string-expr] or @racket[(exact string-expr)] — Exact string matching}
-@item{@racket[(regex regex-expr)] — Regular expression matching with capture group support}
-@item{@racket[(glob glob-string-expr)] — Glob pattern matching with @litchar{*} and @litchar{?} wildcards}
-]
-
-@bold{Actions:}
-@itemlist[
-@item{@racket[(send-input text-expr)] — Send text as input to the process}
-@item{@racket[continue] — Proceed to the next pattern}
-@item{@racket[retry] — Retry the current pattern}
-@item{@racket[(error message-expr)] — Raise an error with the given message}
-@item{@racket[procedure-expr] — Call a custom procedure with session and variables}
-]
+Runs @racket[cmd-expr] as an interactive subprocess and processes
+pattern/action pairs in order. Each pattern is matched against accumulated
+output; when it matches, the action is executed. Regex captures are available
+for substitution in @racket[(send-input text-expr)] as @racket[$0],
+@racket[$1], and so on.
 }
-
-@bold{Examples:}
-
-Simple command interaction:
-@racketblock[
-  (expect/shell/patterns "bash"
-    ["$" (send-input "echo hello")]
-    ["hello" (send-input "exit")])]
-
-Using regex patterns:
-@racketblock[
-  (expect/shell/patterns "server"
-    [(regex #rx"Server started on port ([0-9]+)")
-     (send-input "connect")]
-    ["Connected" continue])]
-
-Glob patterns and error handling:
-@racketblock[
-  (expect/shell/patterns "deployment-script"
-    [(glob "*$ ") (send-input "deploy app")]
-    [(glob "*Success*") continue]
-    [(glob "*Error*") (error "Deployment failed")]
-    [(glob "*Warning*") continue])]
-
-Variable capture and substitution:
-@racketblock[
-  (expect/shell/patterns "bash"
-    ["$" (send-input "echo 'port: 8080'")]
-    [(regex #rx"port: ([0-9]+)") (send-input "connect $0")]
-    ["connected" (send-input "exit")])]
-
-@subsection{Advanced Pattern Features}
-
-@subsubsection{Variable Capture}
-
-When using @racket[(regex regex-expr)] patterns, capture groups are automatically 
-extracted and made available for variable substitution in subsequent actions. 
-Variables are referenced as @racket[$0], @racket[$1], @racket[$2], etc., where 
-@racket[$0] is the first capture group.
-
-@racketblock[
-  (expect/shell/patterns "date"
-    [(regex #rx"([A-Z][a-z]+) ([0-9]+)") 
-     (send-input "echo Month: $0, Day: $1")])]
-
-@subsubsection{Flow Control}
-
-@itemlist[
-@item{@racket[continue] — Advances to the next pattern in the sequence}
-@item{@racket[retry] — Repeats the current pattern (useful for polling)}
-@item{@racket[(error msg)] — Terminates with a controlled error}
-]
-
-@racketblock[
-  (expect/shell/patterns "build-system"
-    ["Building..." continue]
-    [(regex #rx"Progress: ([0-9]+)%") retry]  ; Keep polling
-    ["Build complete" continue]
-    [(glob "*failed*") (error "Build failed")])]
-
-@subsubsection{Custom Actions}
-
-For complex logic, actions can be procedures that receive the session state and captured variables:
-
-@racketblock[
-  (define (analyze-output session vars)
-    (if (> (length vars) 0)
-        (printf "Captured: ~a~n" (car vars))
-        (printf "No captures~n"))
-    'continue)
-
-  (expect/shell/patterns "analyzer"
-    [(regex #rx"Result: (.+)") analyze-output])]
 
 @subsection{Pattern Matching Reference}
 
@@ -581,8 +502,8 @@ For complex logic, actions can be procedures that receive the session state and 
 Tests whether @racket[pattern] matches @racket[text]. Returns three values:
 whether the pattern matched, updated variable list with any captures, and the text.
 
-This function underlies the pattern matching in @racket[expect/shell/patterns] and 
-can be used directly for testing pattern logic.
+This function underlies the pattern matching in @racket[expect/shell/patterns]
+and can be used directly for testing pattern logic.
 }
 
 @racketblock[
@@ -591,43 +512,6 @@ can be used directly for testing pattern logic.
   ; matched? => #t
   ; vars => '("8080")
 ]
-
-@subsection{Error Handling and Debugging}
-
-When patterns fail to match, @racket[expect/shell/patterns] reports details
-including:
-
-@itemlist[
-@item{The accumulated output at the time of failure}
-@item{The pattern that was being matched}
-@item{Suggestions for common issues}
-]
-
-For debugging complex interactions, enable verbose mode with @racket[recspecs-verbose?] 
-or the @tt{RECSPECS_VERBOSE} environment variable to see real-time output.
-
-@subsection{Migration from Basic Shell Testing}
-
-Existing @racket[expect/shell] tests can be gradually migrated to the pattern-based 
-approach for enhanced functionality:
-
-@racketblock[
-  ; Before: transcript-based
-  @expect/shell["interactive-app"]{
-  > start
-  Ready
-  > process data.txt
-  Processing...
-  Done
-  > quit
-  }
-
-  ; After: pattern-based
-  (expect/shell/patterns "interactive-app"
-    ["$" (send-input "start")]
-    ["Ready" (send-input "process data.txt")]
-    [(glob "*Processing*") continue]
-    ["Done" (send-input "quit")])]
 
 @subsection{Pattern and Action Structures}
 

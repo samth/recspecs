@@ -171,6 +171,9 @@ Automatically print a value before comparing:
 Check an interactive shell transcript:
 
 ```racket
+#lang at-exp racket
+(require recspecs/shell)
+
 @expect/shell["cat"]{
 > hi
 hi
